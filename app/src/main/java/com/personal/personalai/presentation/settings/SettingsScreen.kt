@@ -70,14 +70,14 @@ fun SettingsScreen(
                 ) {
                     Text("AI Backend", style = MaterialTheme.typography.titleMedium)
                     Text(
-                        "Enter your Claude API key to replace the built-in mock AI with real responses.",
+                        "Enter your OpenAI API key (sk-...) to replace the built-in mock AI with real GPT-4o mini responses.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     OutlinedTextField(
                         value = uiState.apiKey,
                         onValueChange = viewModel::onApiKeyChanged,
-                        label = { Text("API Key") },
+                        label = { Text("OpenAI API Key (sk-...)") },
                         visualTransformation = PasswordVisualTransformation(),
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true

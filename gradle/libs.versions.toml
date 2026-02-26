@@ -17,6 +17,7 @@ junit = "4.13.2"
 mockk = "1.13.12"
 junitExt = "1.2.1"
 testRunner = "1.6.2"
+okhttp = "4.12.0"
 
 [libraries]
 # Core
@@ -57,6 +58,9 @@ kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-
 
 # DataStore
 datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
+
+# Networking
+okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
 
 # Testing
 junit = { group = "junit", name = "junit", version.ref = "junit" }

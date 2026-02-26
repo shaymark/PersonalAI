@@ -95,6 +95,9 @@ dependencies {
     // DataStore
     implementation(libs.datastore.preferences)
 
+    // Networking
+    implementation(libs.okhttp)
+
     // Debug
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
