@@ -1,0 +1,29 @@
+# Gradle
+.gradle/
+build/
+**/build/
+
+# Local configuration
+local.properties
+*.local.properties
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+*.ipr
+*.iws
+.DS_Store
+
+# Keystore files (never commit secrets)
+*.jks
+*.keystore
+
+# Google services (contains API keys)
+google-services.json
+
+# Native build
+.externalNativeBuild/
+.cxx/
+
+# Screenshots (generated artifact, not source)
+screenshots/

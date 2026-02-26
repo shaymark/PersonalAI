@@ -1,0 +1,87 @@
+package com.personal.personalai.presentation.navigation
+
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material3.Icon
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.navigation.NavDestination.Companion.hierarchy
+import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
+import com.personal.personalai.presentation.chat.ChatScreen
+import com.personal.personalai.presentation.schedule.ScheduledTasksScreen
+import com.personal.personalai.presentation.settings.SettingsScreen
+
+@Composable
+fun AppNavGraph() {
+    val navController = rememberNavController()
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentDestination = navBackStackEntry?.destination
+
+    val bottomNavScreens = listOf(Screen.Chat, Screen.ScheduledTasks)
+
+    Scaffold(
+        bottomBar = {
+            NavigationBar {
+                bottomNavScreens.forEach { screen ->
+                    NavigationBarItem(
+                        icon = {
+                            when (screen) {
+                                Screen.Chat -> Icon(Icons.Default.Home, contentDescription = "Chat")
+                                Screen.ScheduledTasks -> Icon(Icons.Default.DateRange, contentDescription = "Schedule")
+                                else -> Unit
+                            }
+                        },
+                        label = {
+                            Text(
+                                when (screen) {
+                                    Screen.Chat -> "Chat"
+                                    Screen.ScheduledTasks -> "Schedule"
+                                    else -> ""
+                                }
+                            )
+                        },
+                        selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true,
+                        onClick = {
+                            navController.navigate(screen.route) {
+                                popUpTo(navController.graph.findStartDestination().id) {
+                                    saveState = true
+                                }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        }
+                    )
+                }
+            }
+        }
+    ) { innerPadding ->
+        NavHost(
+            navController = navController,
+            startDestination = Screen.Chat.route
+        ) {
+            composable(Screen.Chat.route) {
+                ChatScreen(
+                    innerPadding = innerPadding,
+                    onNavigateToSettings = { navController.navigate(Screen.Settings.route) }
+                )
+            }
+            composable(Screen.ScheduledTasks.route) {
+                ScheduledTasksScreen(innerPadding = innerPadding)
+            }
+            composable(Screen.Settings.route) {
+                SettingsScreen(
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+        }
+    }
+}
