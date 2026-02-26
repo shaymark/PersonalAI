@@ -6,14 +6,18 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.room.Room
 import androidx.work.WorkManager
+import com.personal.personalai.data.local.MIGRATION_1_2
 import com.personal.personalai.data.local.PersonalAIDatabase
+import com.personal.personalai.data.local.dao.MemoryDao
 import com.personal.personalai.data.local.dao.MessageDao
 import com.personal.personalai.data.local.dao.ScheduledTaskDao
 import com.personal.personalai.data.repository.AiRepositoryImpl
 import com.personal.personalai.data.repository.ChatRepositoryImpl
+import com.personal.personalai.data.repository.MemoryRepositoryImpl
 import com.personal.personalai.data.repository.TaskRepositoryImpl
 import com.personal.personalai.domain.repository.AiRepository
 import com.personal.personalai.domain.repository.ChatRepository
+import com.personal.personalai.domain.repository.MemoryRepository
 import com.personal.personalai.domain.repository.TaskRepository
 import dagger.Binds
 import dagger.Module
@@ -35,6 +39,7 @@ object DatabaseModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): PersonalAIDatabase =
         Room.databaseBuilder(context, PersonalAIDatabase::class.java, "personal_ai_db")
+            .addMigrations(MIGRATION_1_2)
             .build()
 
     @Provides
@@ -42,6 +47,9 @@ object DatabaseModule {
 
     @Provides
     fun provideScheduledTaskDao(db: PersonalAIDatabase): ScheduledTaskDao = db.scheduledTaskDao()
+
+    @Provides
+    fun provideMemoryDao(db: PersonalAIDatabase): MemoryDao = db.memoryDao()
 
     @Provides
     @Singleton
@@ -78,4 +86,8 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindTaskRepository(impl: TaskRepositoryImpl): TaskRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindMemoryRepository(impl: MemoryRepositoryImpl): MemoryRepository
 }

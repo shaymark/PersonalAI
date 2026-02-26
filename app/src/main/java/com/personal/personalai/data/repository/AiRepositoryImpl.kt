@@ -6,6 +6,7 @@ import com.personal.personalai.data.datasource.ai.MockAiDataSource
 import com.personal.personalai.data.datasource.ai.OpenAiDataSource
 import com.personal.personalai.domain.model.Message
 import com.personal.personalai.domain.repository.AiRepository
+import com.personal.personalai.domain.repository.MemoryRepository
 import com.personal.personalai.presentation.settings.PreferencesKeys
 import kotlinx.coroutines.flow.first
 import javax.inject.Inject
@@ -15,20 +16,25 @@ import javax.inject.Inject
  * - If an OpenAI API key is stored in DataStore → delegates to [OpenAiDataSource]
  * - Otherwise → delegates to [MockAiDataSource]
  *
+ * Loads the user's memories before each call and passes them to the data source so they
+ * can be injected into the system prompt.
+ *
  * This class owns no AI logic itself; it is purely a router.
  */
 class AiRepositoryImpl @Inject constructor(
     private val openAiDataSource: OpenAiDataSource,
     private val mockAiDataSource: MockAiDataSource,
-    private val dataStore: DataStore<Preferences>
+    private val dataStore: DataStore<Preferences>,
+    private val memoryRepository: MemoryRepository
 ) : AiRepository {
 
     override suspend fun sendMessage(message: String, chatHistory: List<Message>): Result<String> {
         val apiKey = dataStore.data.first()[PreferencesKeys.API_KEY].orEmpty()
+        val memories = memoryRepository.getMemories().first()
         return if (apiKey.isBlank()) {
-            mockAiDataSource.sendMessage(message, chatHistory)
+            mockAiDataSource.sendMessage(message, chatHistory, memories)
         } else {
-            openAiDataSource.sendMessage(apiKey, chatHistory)
+            openAiDataSource.sendMessage(apiKey, chatHistory, memories)
         }
     }
 }
