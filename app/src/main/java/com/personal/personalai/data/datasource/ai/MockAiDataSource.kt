@@ -68,6 +68,16 @@ class MockAiDataSource @Inject constructor() {
                     "I can schedule a reminder to check for you — say \"remind me to check the weather at 7am\"!"
                 )
 
+            lower.containsAny(
+                "search for", "search the web", "look up", "look it up",
+                "check online", "find on the internet", "google",
+                "what's happening", "latest news", "current events", "browse"
+            ) ->
+                Result.success(
+                    "I'd love to help search the web, but I'm running in offline/mock mode. " +
+                    "Please add your OpenAI API key in \u2699\uFE0F Settings to enable real web search."
+                )
+
             else ->
                 Result.success(
                     "Got your message! (Running in mock mode — add your OpenAI API key in " +

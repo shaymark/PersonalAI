@@ -25,7 +25,7 @@ class OpenAiDataSource @Inject constructor(
 ) {
 
     companion object {
-        private const val OPENAI_URL = "https://api.openai.com/v1/chat/completions"
+        private const val OPENAI_URL = "https://api.openai.com/v1/responses"
         private const val MODEL = "gpt-4o-mini"
         private const val MAX_HISTORY_MESSAGES = 20
         private val MEDIA_TYPE_JSON = "application/json; charset=utf-8".toMediaType()
@@ -33,6 +33,9 @@ class OpenAiDataSource @Inject constructor(
         private val SYSTEM_PROMPT_TEMPLATE = """
             You are a helpful personal AI assistant running on an Android app.
             You can answer questions and have natural conversations.
+            You have access to real-time web search. When the user asks about current events,
+            live data, or anything that benefits from searching the internet, use your web
+            search capability to find up-to-date information.
             {{MEMORIES_SECTION}}
             IMPORTANT — Task scheduling: When the user wants to schedule a reminder or task
             (e.g. "remind me to...", "schedule a...", "set a reminder for...", "notify me..."),
@@ -69,16 +72,9 @@ class OpenAiDataSource @Inject constructor(
         memories: List<Memory>
     ): Result<String> = withContext(Dispatchers.IO) {
         try {
-            val systemPrompt = buildSystemPrompt(memories)
-            val messages = JSONArray()
-
-            messages.put(JSONObject().apply {
-                put("role", "system")
-                put("content", systemPrompt)
-            })
-
+            val inputMessages = JSONArray()
             chatHistory.takeLast(MAX_HISTORY_MESSAGES).forEach { msg ->
-                messages.put(JSONObject().apply {
+                inputMessages.put(JSONObject().apply {
                     put("role", if (msg.role == MessageRole.USER) "user" else "assistant")
                     put("content", msg.content)
                 })
@@ -86,9 +82,9 @@ class OpenAiDataSource @Inject constructor(
 
             val requestBody = JSONObject().apply {
                 put("model", MODEL)
-                put("messages", messages)
-                put("temperature", 0.7)
-                put("max_tokens", 500)
+                put("instructions", buildSystemPrompt(memories))
+                put("tools", JSONArray().put(JSONObject().put("type", "web_search_preview")))
+                put("input", inputMessages)
             }
 
             val request = Request.Builder()
@@ -109,13 +105,20 @@ class OpenAiDataSource @Inject constructor(
                 return@withContext Result.failure(Exception(errorMsg))
             }
 
-            val content = JSONObject(responseBody)
-                .getJSONArray("choices")
-                .getJSONObject(0)
-                .getJSONObject("message")
-                .getString("content")
-
-            Result.success(content.trim())
+            val output = JSONObject(responseBody).getJSONArray("output")
+            for (i in 0 until output.length()) {
+                val item = output.getJSONObject(i)
+                if (item.getString("type") == "message") {
+                    val content = item.getJSONArray("content")
+                    for (j in 0 until content.length()) {
+                        val contentItem = content.getJSONObject(j)
+                        if (contentItem.getString("type") == "output_text") {
+                            return@withContext Result.success(contentItem.getString("text").trim())
+                        }
+                    }
+                }
+            }
+            return@withContext Result.failure(Exception("No text response in output"))
         } catch (e: Exception) {
             Result.failure(e)
         }
