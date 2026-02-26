@@ -1,4 +1,4 @@
-package com.personal.personalai.data.repository
+package com.personal.personalai.data.datasource.ai
 
 import com.personal.personalai.domain.model.Message
 import java.time.ZoneId
@@ -10,7 +10,7 @@ import javax.inject.Inject
  * Used when no OpenAI API key is configured.
  * Has no external dependencies — pure, deterministic, and fully unit-testable.
  */
-class MockAiRepositoryImpl @Inject constructor() {
+class MockAiDataSource @Inject constructor() {
 
     fun sendMessage(message: String, chatHistory: List<Message>): Result<String> {
         val lower = message.lowercase()

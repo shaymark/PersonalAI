@@ -1,4 +1,4 @@
-package com.personal.personalai.data.repository
+package com.personal.personalai.data.datasource.ai
 
 import com.personal.personalai.domain.model.Message
 import com.personal.personalai.domain.model.MessageRole
@@ -19,7 +19,7 @@ import javax.inject.Inject
  * Requires a valid API key to be passed on every call.
  * Contains no knowledge of DataStore, mock responses, or key management.
  */
-class OpenAiRepositoryImpl @Inject constructor(
+class OpenAiDataSource @Inject constructor(
     private val okHttpClient: OkHttpClient
 ) {
 
