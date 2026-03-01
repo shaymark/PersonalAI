@@ -2,6 +2,7 @@ package com.personal.personalai.worker
 
 import android.app.NotificationManager
 import android.content.Context
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.hilt.work.HiltWorker
 import androidx.work.Constraints
@@ -95,6 +96,7 @@ class TaskReminderWorker @AssistedInject constructor(
     private suspend fun handleAiTask(title: String): Result {
         val aiPrompt = inputData.getString(KEY_AI_PROMPT)
         if (aiPrompt.isNullOrBlank()) {
+            Log.e(TAG, "AI task \"$title\" has no prompt — aborting")
             showFailureNotification(title)
             return Result.failure()
         }
@@ -117,6 +119,8 @@ class TaskReminderWorker @AssistedInject constructor(
             }
             Result.success()
         } else {
+            val error = aiResult.exceptionOrNull()
+            Log.e(TAG, "AI task \"$title\" failed: ${error?.message}", error)
             showFailureNotification(title)
             Result.failure()
         }
@@ -184,6 +188,7 @@ class TaskReminderWorker @AssistedInject constructor(
             .trim()
 
     companion object {
+        private const val TAG = "TaskReminderWorker"
         const val CHANNEL_ID = "task_reminders"
         const val KEY_TASK_TITLE = "task_title"
         const val KEY_TASK_DESCRIPTION = "task_description"

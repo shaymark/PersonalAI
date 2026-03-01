@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.Preferences
 import com.personal.personalai.data.datasource.ai.MockAiDataSource
 import com.personal.personalai.data.datasource.ai.OpenAiDataSource
 import com.personal.personalai.domain.model.Message
+import com.personal.personalai.domain.model.MessageRole
 import com.personal.personalai.domain.repository.AiRepository
 import com.personal.personalai.domain.repository.MemoryRepository
 import com.personal.personalai.presentation.settings.PreferencesKeys
@@ -34,7 +35,15 @@ class AiRepositoryImpl @Inject constructor(
         return if (apiKey.isBlank()) {
             mockAiDataSource.sendMessage(message, chatHistory, memories)
         } else {
-            openAiDataSource.sendMessage(apiKey, chatHistory, memories)
+            // chatHistory from SendMessageUseCase already contains the user's message as the last
+            // entry. For callers like TaskReminderWorker that pass emptyList(), we append the
+            // message here so OpenAI always receives at least one user turn.
+            val inputHistory = if (chatHistory.lastOrNull()?.content == message) {
+                chatHistory
+            } else {
+                chatHistory + Message(content = message, role = MessageRole.USER)
+            }
+            openAiDataSource.sendMessage(apiKey, inputHistory, memories)
         }
     }
 }
