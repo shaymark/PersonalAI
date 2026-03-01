@@ -192,13 +192,6 @@ private fun TaskCard(task: ScheduledTask, onEdit: () -> Unit, onDelete: () -> Un
                     modifier = Modifier.padding(end = 8.dp)
                 )
             }
-            if (task.recurrenceType != RecurrenceType.NONE) {
-                Text(
-                    text = "🔁",
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(end = 8.dp)
-                )
-            }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = task.title,
@@ -219,12 +212,12 @@ private fun TaskCard(task: ScheduledTask, onEdit: () -> Unit, onDelete: () -> Un
                     )
                 }
                 val recurrenceLabel = when (task.recurrenceType) {
-                    RecurrenceType.DAILY  -> " · Repeats daily"
-                    RecurrenceType.WEEKLY -> " · Repeats weekly"
+                    RecurrenceType.DAILY  -> "🔁 Repeats daily"
+                    RecurrenceType.WEEKLY -> "🔁 Repeats weekly"
                     RecurrenceType.NONE   -> ""
                 }
                 Text(
-                    text = formatScheduledTime(task.scheduledAt) + recurrenceLabel,
+                    text = formatScheduledTime(task.scheduledAt) + if (recurrenceLabel.isNotEmpty()) " · $recurrenceLabel" else "",
                     style = MaterialTheme.typography.labelSmall,
                     color = if (isOverdue) MaterialTheme.colorScheme.error
                     else MaterialTheme.colorScheme.outline
