@@ -1,10 +1,13 @@
 package com.personal.personalai.domain.usecase
 
+import androidx.work.Constraints
+import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.workDataOf
 import com.personal.personalai.domain.model.ScheduledTask
 import com.personal.personalai.domain.model.TaskInfo
+import com.personal.personalai.domain.model.TaskType
 import com.personal.personalai.domain.repository.TaskRepository
 import com.personal.personalai.worker.TaskReminderWorker
 import java.time.LocalDateTime
@@ -32,8 +35,16 @@ class CreateScheduledTaskUseCase @Inject constructor(
 
             val delayMillis = scheduledAt - System.currentTimeMillis()
             if (delayMillis > 0) {
+                val constraints = when (taskInfo.taskType) {
+                    TaskType.AI_PROMPT -> Constraints.Builder()
+                        .setRequiredNetworkType(NetworkType.CONNECTED)
+                        .build()
+                    TaskType.REMINDER -> Constraints.NONE
+                }
+
                 val workRequest = OneTimeWorkRequestBuilder<TaskReminderWorker>()
                     .setInitialDelay(delayMillis, TimeUnit.MILLISECONDS)
+                    .setConstraints(constraints)
                     .setInputData(
                         workDataOf(
                             TaskReminderWorker.KEY_TASK_TITLE to taskInfo.title,
