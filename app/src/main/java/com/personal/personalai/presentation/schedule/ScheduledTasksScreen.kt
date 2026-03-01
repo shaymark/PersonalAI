@@ -35,6 +35,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -64,7 +65,10 @@ fun ScheduledTasksScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = viewModel::showAddDialog) {
+            FloatingActionButton(
+                onClick = viewModel::showAddDialog,
+                modifier = Modifier.padding(bottom = innerPadding.calculateBottomPadding())
+            ) {
                 Icon(Icons.Default.Add, contentDescription = "Add task")
             }
         }
@@ -316,6 +320,24 @@ private fun AddTaskDialog(
             TextButton(onClick = onDismiss) { Text("Cancel") }
         }
     )
+}
+
+@Preview
+@Composable
+private fun AddTaskDialogPreview() {
+    MaterialTheme {
+        AddTaskDialog(
+            uiState = ScheduledTasksUiState(),
+            onTitleChanged = {},
+            onDescriptionChanged = {},
+            onScheduledAtChanged = {},
+            onTaskTypeChanged = {},
+            onAiPromptChanged = {},
+            onOutputTargetChanged = {},
+            onConfirm = {},
+            onDismiss = {}
+        )
+    }
 }
 
 private fun formatScheduledTime(epochMillis: Long): String =
