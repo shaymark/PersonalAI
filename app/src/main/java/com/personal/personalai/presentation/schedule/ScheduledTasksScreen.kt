@@ -1,5 +1,8 @@
 package com.personal.personalai.presentation.schedule
 
+import android.app.DatePickerDialog
+import android.app.TimePickerDialog
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,6 +19,8 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -34,6 +39,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -43,6 +49,7 @@ import com.personal.personalai.domain.model.OutputTarget
 import com.personal.personalai.domain.model.ScheduledTask
 import com.personal.personalai.domain.model.TaskType
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
@@ -90,6 +97,7 @@ fun ScheduledTasksScreen(
                     items(uiState.tasks, key = { it.id }) { task ->
                         TaskCard(
                             task = task,
+                            onEdit = { viewModel.showEditDialog(task) },
                             onDelete = { viewModel.deleteTask(task) }
                         )
                     }
@@ -109,6 +117,20 @@ fun ScheduledTasksScreen(
             onOutputTargetChanged = viewModel::onOutputTargetChanged,
             onConfirm = viewModel::createTask,
             onDismiss = viewModel::dismissAddDialog
+        )
+    }
+
+    if (uiState.editingTask != null) {
+        EditTaskDialog(
+            uiState = uiState,
+            onTitleChanged = viewModel::onTitleChanged,
+            onDescriptionChanged = viewModel::onDescriptionChanged,
+            onScheduledAtChanged = viewModel::onScheduledAtChanged,
+            onTaskTypeChanged = viewModel::onTaskTypeChanged,
+            onAiPromptChanged = viewModel::onAiPromptChanged,
+            onOutputTargetChanged = viewModel::onOutputTargetChanged,
+            onConfirm = viewModel::saveEditedTask,
+            onDismiss = viewModel::dismissEditDialog
         )
     }
 }
@@ -141,10 +163,12 @@ private fun EmptyState(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun TaskCard(task: ScheduledTask, onDelete: () -> Unit) {
+private fun TaskCard(task: ScheduledTask, onEdit: () -> Unit, onDelete: () -> Unit) {
     val isOverdue = task.scheduledAt < System.currentTimeMillis() && !task.isCompleted
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onEdit() },
         colors = CardDefaults.cardColors(
             containerColor = if (isOverdue)
                 MaterialTheme.colorScheme.errorContainer
@@ -315,6 +339,164 @@ private fun AddTaskDialog(
                 enabled = uiState.newTaskTitle.isNotBlank() &&
                     (uiState.newTaskType == TaskType.REMINDER || uiState.newAiPrompt.isNotBlank())
             ) { Text("Schedule") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
+}
+
+@Composable
+private fun EditTaskDialog(
+    uiState: ScheduledTasksUiState,
+    onTitleChanged: (String) -> Unit,
+    onDescriptionChanged: (String) -> Unit,
+    onScheduledAtChanged: (Long) -> Unit,
+    onTaskTypeChanged: (TaskType) -> Unit,
+    onAiPromptChanged: (String) -> Unit,
+    onOutputTargetChanged: (OutputTarget) -> Unit,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    val isFuture = uiState.newTaskScheduledAt > System.currentTimeMillis()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit Task") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                // Title
+                OutlinedTextField(
+                    value = uiState.newTaskTitle,
+                    onValueChange = onTitleChanged,
+                    label = { Text("Title *") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+
+                // Task type selector
+                Text("Task Type", style = MaterialTheme.typography.labelMedium)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = uiState.newTaskType == TaskType.REMINDER,
+                        onClick = { onTaskTypeChanged(TaskType.REMINDER) },
+                        label = { Text("Reminder") }
+                    )
+                    FilterChip(
+                        selected = uiState.newTaskType == TaskType.AI_PROMPT,
+                        onClick = { onTaskTypeChanged(TaskType.AI_PROMPT) },
+                        label = { Text("AI Task") }
+                    )
+                }
+
+                // Conditional: description for Reminder, prompt + output for AI Task
+                if (uiState.newTaskType == TaskType.REMINDER) {
+                    OutlinedTextField(
+                        value = uiState.newTaskDescription,
+                        onValueChange = onDescriptionChanged,
+                        label = { Text("Description (optional)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        maxLines = 2
+                    )
+                } else {
+                    OutlinedTextField(
+                        value = uiState.newAiPrompt,
+                        onValueChange = onAiPromptChanged,
+                        label = { Text("Prompt *") },
+                        placeholder = { Text("e.g. What are today's top news headlines?") },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 2,
+                        maxLines = 4
+                    )
+                    Text("Deliver to", style = MaterialTheme.typography.labelMedium)
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        FilterChip(
+                            selected = uiState.newOutputTarget == OutputTarget.NOTIFICATION,
+                            onClick = { onOutputTargetChanged(OutputTarget.NOTIFICATION) },
+                            label = { Text("Notification") }
+                        )
+                        FilterChip(
+                            selected = uiState.newOutputTarget == OutputTarget.CHAT,
+                            onClick = { onOutputTargetChanged(OutputTarget.CHAT) },
+                            label = { Text("Chat") }
+                        )
+                        FilterChip(
+                            selected = uiState.newOutputTarget == OutputTarget.BOTH,
+                            onClick = { onOutputTargetChanged(OutputTarget.BOTH) },
+                            label = { Text("Both") }
+                        )
+                    }
+                }
+
+                // Scheduled time display
+                Text(
+                    text = "Scheduled: ${formatScheduledTime(uiState.newTaskScheduledAt)}" +
+                        if (!isFuture) " ⚠️ Must be in the future" else "",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (isFuture) MaterialTheme.colorScheme.onSurfaceVariant
+                            else MaterialTheme.colorScheme.error
+                )
+
+                // Date + time picker button
+                Button(
+                    onClick = {
+                        val cal = Calendar.getInstance().apply {
+                            timeInMillis = uiState.newTaskScheduledAt
+                        }
+                        DatePickerDialog(
+                            context,
+                            { _, year, month, day ->
+                                TimePickerDialog(
+                                    context,
+                                    { _, hour, minute ->
+                                        val newCal = Calendar.getInstance()
+                                        newCal.set(year, month, day, hour, minute, 0)
+                                        newCal.set(Calendar.MILLISECOND, 0)
+                                        onScheduledAtChanged(newCal.timeInMillis)
+                                    },
+                                    cal.get(Calendar.HOUR_OF_DAY),
+                                    cal.get(Calendar.MINUTE),
+                                    true
+                                ).show()
+                            },
+                            cal.get(Calendar.YEAR),
+                            cal.get(Calendar.MONTH),
+                            cal.get(Calendar.DAY_OF_MONTH)
+                        ).show()
+                    },
+                    colors = ButtonDefaults.outlinedButtonColors()
+                ) {
+                    Text("📅 Pick date & time")
+                }
+
+                // Quick-pick shortcuts
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    FilterChip(
+                        selected = false,
+                        onClick = { onScheduledAtChanged(System.currentTimeMillis() + 30 * 60 * 1000L) },
+                        label = { Text("+30 min") }
+                    )
+                    FilterChip(
+                        selected = false,
+                        onClick = { onScheduledAtChanged(System.currentTimeMillis() + 60 * 60 * 1000L) },
+                        label = { Text("+1 hour") }
+                    )
+                    FilterChip(
+                        selected = false,
+                        onClick = { onScheduledAtChanged(System.currentTimeMillis() + 24 * 60 * 60 * 1000L) },
+                        label = { Text("+1 day") }
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = onConfirm,
+                enabled = uiState.newTaskTitle.isNotBlank() &&
+                    (uiState.newTaskType == TaskType.REMINDER || uiState.newAiPrompt.isNotBlank()) &&
+                    isFuture
+            ) { Text("Save") }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Cancel") }

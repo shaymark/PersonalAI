@@ -25,6 +25,9 @@ class TaskRepositoryImpl @Inject constructor(
     override suspend fun markCompleted(taskId: Long) =
         scheduledTaskDao.markCompleted(taskId)
 
+    override suspend fun updateTask(task: ScheduledTask) =
+        scheduledTaskDao.updateTask(task.toEntity())
+
     override suspend fun updateWorkerId(taskId: Long, workerId: String) =
         scheduledTaskDao.updateWorkerId(taskId, workerId)
 }

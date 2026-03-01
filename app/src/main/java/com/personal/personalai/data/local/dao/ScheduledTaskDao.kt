@@ -5,6 +5,7 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Update
 import com.personal.personalai.data.local.entity.ScheduledTaskEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -16,6 +17,9 @@ interface ScheduledTaskDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTask(task: ScheduledTaskEntity): Long
+
+    @Update
+    suspend fun updateTask(task: ScheduledTaskEntity)
 
     @Delete
     suspend fun deleteTask(task: ScheduledTaskEntity)

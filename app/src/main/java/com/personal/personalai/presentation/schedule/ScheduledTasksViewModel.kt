@@ -9,6 +9,7 @@ import com.personal.personalai.domain.model.TaskType
 import com.personal.personalai.domain.usecase.CreateScheduledTaskUseCase
 import com.personal.personalai.domain.usecase.DeleteScheduledTaskUseCase
 import com.personal.personalai.domain.usecase.GetScheduledTasksUseCase
+import com.personal.personalai.domain.usecase.UpdateScheduledTaskUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -24,7 +25,8 @@ import javax.inject.Inject
 class ScheduledTasksViewModel @Inject constructor(
     private val getScheduledTasksUseCase: GetScheduledTasksUseCase,
     private val createScheduledTaskUseCase: CreateScheduledTaskUseCase,
-    private val deleteScheduledTaskUseCase: DeleteScheduledTaskUseCase
+    private val deleteScheduledTaskUseCase: DeleteScheduledTaskUseCase,
+    private val updateScheduledTaskUseCase: UpdateScheduledTaskUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ScheduledTasksUiState(isLoading = true))
@@ -108,6 +110,50 @@ class ScheduledTasksViewModel @Inject constructor(
 
     fun deleteTask(task: ScheduledTask) {
         viewModelScope.launch { deleteScheduledTaskUseCase(task) }
+    }
+
+    fun showEditDialog(task: ScheduledTask) = _uiState.update {
+        it.copy(
+            editingTask        = task,
+            newTaskTitle       = task.title,
+            newTaskDescription = task.description,
+            newTaskScheduledAt = task.scheduledAt,
+            newTaskType        = task.taskType,
+            newAiPrompt        = task.aiPrompt ?: "",
+            newOutputTarget    = task.outputTarget
+        )
+    }
+
+    fun dismissEditDialog() = _uiState.update {
+        it.copy(
+            editingTask        = null,
+            newTaskTitle       = "",
+            newTaskDescription = "",
+            newTaskType        = TaskType.REMINDER,
+            newAiPrompt        = "",
+            newOutputTarget    = OutputTarget.NOTIFICATION
+        )
+    }
+
+    fun saveEditedTask() {
+        val state = _uiState.value
+        val task = state.editingTask ?: return
+        if (state.newTaskTitle.isBlank()) return
+        if (state.newTaskType == TaskType.AI_PROMPT && state.newAiPrompt.isBlank()) return
+        if (state.newTaskScheduledAt <= System.currentTimeMillis()) return
+
+        viewModelScope.launch {
+            val updated = task.copy(
+                title        = state.newTaskTitle.trim(),
+                description  = state.newTaskDescription.trim(),
+                scheduledAt  = state.newTaskScheduledAt,
+                taskType     = state.newTaskType,
+                aiPrompt     = state.newAiPrompt.trim().takeIf { it.isNotBlank() },
+                outputTarget = state.newOutputTarget
+            )
+            updateScheduledTaskUseCase(updated)
+            dismissEditDialog()
+        }
     }
 
     private fun epochToIso(epochMillis: Long): String =

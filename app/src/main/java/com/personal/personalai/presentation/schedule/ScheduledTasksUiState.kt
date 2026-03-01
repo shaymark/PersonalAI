@@ -8,6 +8,7 @@ data class ScheduledTasksUiState(
     val tasks: List<ScheduledTask> = emptyList(),
     val isLoading: Boolean = false,
     val showAddDialog: Boolean = false,
+    val editingTask: ScheduledTask? = null,   // non-null → edit dialog is open
     val newTaskTitle: String = "",
     val newTaskDescription: String = "",
     val newTaskScheduledAt: Long = System.currentTimeMillis() + 60 * 60 * 1000L,

@@ -8,5 +8,6 @@ interface TaskRepository {
     suspend fun insertTask(task: ScheduledTask): Long
     suspend fun deleteTask(task: ScheduledTask)
     suspend fun markCompleted(taskId: Long)
+    suspend fun updateTask(task: ScheduledTask)
     suspend fun updateWorkerId(taskId: Long, workerId: String)
 }
