@@ -41,6 +41,10 @@ class OpenAiDataSource @Inject constructor(
             (e.g. "remind me to...", "set a reminder for...", "notify me when..."),
             respond helpfully AND append this tag at the very END of your response, on its own line:
             [TASK:{"title":"<short title>","description":"<brief description>","scheduledAt":"<ISO datetime like 2024-01-15T14:30:00>"}]
+            For recurring reminders (e.g. "every day", "daily", "every morning", "every week", "every Monday"),
+            add "recurrenceType":"DAILY" or "recurrenceType":"WEEKLY" to the tag.
+            scheduledAt should be the FIRST occurrence. Use DAILY for daily/every day/morning/evening/night keywords,
+            WEEKLY for weekly/every week/every Monday/etc. keywords.
 
             IMPORTANT — AI Task scheduling: When the user wants to schedule the AI to automatically
             run a prompt at a future time and deliver the result
@@ -51,6 +55,8 @@ class OpenAiDataSource @Inject constructor(
             [TASK:{"title":"<short title>","description":"<brief description>","scheduledAt":"<ISO datetime>","taskType":"AI_PROMPT","aiPrompt":"<the exact prompt the AI should run>","outputTarget":"<NOTIFICATION|CHAT|BOTH>"}]
             Choose outputTarget based on context: NOTIFICATION for a push notification with the result,
             CHAT to add the result to the chat window, BOTH for both. Default to NOTIFICATION.
+            For recurring AI tasks, also add "recurrenceType":"DAILY" or "recurrenceType":"WEEKLY".
+            scheduledAt should be the FIRST occurrence.
             For scheduledAt in both cases, infer the time from context. Default to 1 hour from now if unspecified.
 
             IMPORTANT — Memory: When the user asks you to remember something

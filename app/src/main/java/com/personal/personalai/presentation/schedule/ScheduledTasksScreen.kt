@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.personal.personalai.domain.model.OutputTarget
+import com.personal.personalai.domain.model.RecurrenceType
 import com.personal.personalai.domain.model.ScheduledTask
 import com.personal.personalai.domain.model.TaskType
 import java.text.SimpleDateFormat
@@ -115,6 +116,7 @@ fun ScheduledTasksScreen(
             onTaskTypeChanged = viewModel::onTaskTypeChanged,
             onAiPromptChanged = viewModel::onAiPromptChanged,
             onOutputTargetChanged = viewModel::onOutputTargetChanged,
+            onRecurrenceTypeChanged = viewModel::onRecurrenceTypeChanged,
             onConfirm = viewModel::createTask,
             onDismiss = viewModel::dismissAddDialog
         )
@@ -129,6 +131,7 @@ fun ScheduledTasksScreen(
             onTaskTypeChanged = viewModel::onTaskTypeChanged,
             onAiPromptChanged = viewModel::onAiPromptChanged,
             onOutputTargetChanged = viewModel::onOutputTargetChanged,
+            onRecurrenceTypeChanged = viewModel::onRecurrenceTypeChanged,
             onConfirm = viewModel::saveEditedTask,
             onDismiss = viewModel::dismissEditDialog
         )
@@ -189,6 +192,13 @@ private fun TaskCard(task: ScheduledTask, onEdit: () -> Unit, onDelete: () -> Un
                     modifier = Modifier.padding(end = 8.dp)
                 )
             }
+            if (task.recurrenceType != RecurrenceType.NONE) {
+                Text(
+                    text = "🔁",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(end = 8.dp)
+                )
+            }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = task.title,
@@ -208,8 +218,13 @@ private fun TaskCard(task: ScheduledTask, onEdit: () -> Unit, onDelete: () -> Un
                         overflow = TextOverflow.Ellipsis
                     )
                 }
+                val recurrenceLabel = when (task.recurrenceType) {
+                    RecurrenceType.DAILY  -> " · Repeats daily"
+                    RecurrenceType.WEEKLY -> " · Repeats weekly"
+                    RecurrenceType.NONE   -> ""
+                }
                 Text(
-                    text = formatScheduledTime(task.scheduledAt),
+                    text = formatScheduledTime(task.scheduledAt) + recurrenceLabel,
                     style = MaterialTheme.typography.labelSmall,
                     color = if (isOverdue) MaterialTheme.colorScheme.error
                     else MaterialTheme.colorScheme.outline
@@ -235,6 +250,7 @@ private fun AddTaskDialog(
     onTaskTypeChanged: (TaskType) -> Unit,
     onAiPromptChanged: (String) -> Unit,
     onOutputTargetChanged: (OutputTarget) -> Unit,
+    onRecurrenceTypeChanged: (RecurrenceType) -> Unit,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -306,6 +322,26 @@ private fun AddTaskDialog(
                     }
                 }
 
+                // Recurrence section
+                Text("Repeat", style = MaterialTheme.typography.labelMedium)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    FilterChip(
+                        selected = uiState.newRecurrenceType == RecurrenceType.NONE,
+                        onClick = { onRecurrenceTypeChanged(RecurrenceType.NONE) },
+                        label = { Text("None") }
+                    )
+                    FilterChip(
+                        selected = uiState.newRecurrenceType == RecurrenceType.DAILY,
+                        onClick = { onRecurrenceTypeChanged(RecurrenceType.DAILY) },
+                        label = { Text("Daily") }
+                    )
+                    FilterChip(
+                        selected = uiState.newRecurrenceType == RecurrenceType.WEEKLY,
+                        onClick = { onRecurrenceTypeChanged(RecurrenceType.WEEKLY) },
+                        label = { Text("Weekly") }
+                    )
+                }
+
                 // Time display
                 Text(
                     "Scheduled: ${formatScheduledTime(uiState.newTaskScheduledAt)}",
@@ -355,6 +391,7 @@ private fun EditTaskDialog(
     onTaskTypeChanged: (TaskType) -> Unit,
     onAiPromptChanged: (String) -> Unit,
     onOutputTargetChanged: (OutputTarget) -> Unit,
+    onRecurrenceTypeChanged: (RecurrenceType) -> Unit,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -427,6 +464,26 @@ private fun EditTaskDialog(
                             label = { Text("Both") }
                         )
                     }
+                }
+
+                // Recurrence section
+                Text("Repeat", style = MaterialTheme.typography.labelMedium)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    FilterChip(
+                        selected = uiState.newRecurrenceType == RecurrenceType.NONE,
+                        onClick = { onRecurrenceTypeChanged(RecurrenceType.NONE) },
+                        label = { Text("None") }
+                    )
+                    FilterChip(
+                        selected = uiState.newRecurrenceType == RecurrenceType.DAILY,
+                        onClick = { onRecurrenceTypeChanged(RecurrenceType.DAILY) },
+                        label = { Text("Daily") }
+                    )
+                    FilterChip(
+                        selected = uiState.newRecurrenceType == RecurrenceType.WEEKLY,
+                        onClick = { onRecurrenceTypeChanged(RecurrenceType.WEEKLY) },
+                        label = { Text("Weekly") }
+                    )
                 }
 
                 // Scheduled time display
@@ -516,6 +573,7 @@ private fun AddTaskDialogPreview() {
             onTaskTypeChanged = {},
             onAiPromptChanged = {},
             onOutputTargetChanged = {},
+            onRecurrenceTypeChanged = {},
             onConfirm = {},
             onDismiss = {}
         )

@@ -30,4 +30,7 @@ class TaskRepositoryImpl @Inject constructor(
 
     override suspend fun updateWorkerId(taskId: Long, workerId: String) =
         scheduledTaskDao.updateWorkerId(taskId, workerId)
+
+    override suspend fun updateNextOccurrence(taskId: Long, scheduledAt: Long, workerId: String) =
+        scheduledTaskDao.updateNextOccurrence(taskId, scheduledAt, workerId)
 }

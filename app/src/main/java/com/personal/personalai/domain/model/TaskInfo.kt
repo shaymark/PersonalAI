@@ -6,5 +6,6 @@ data class TaskInfo(
     val scheduledAtIso: String,
     val taskType: TaskType = TaskType.REMINDER,
     val aiPrompt: String? = null,
-    val outputTarget: OutputTarget = OutputTarget.NOTIFICATION
+    val outputTarget: OutputTarget = OutputTarget.NOTIFICATION,
+    val recurrenceType: RecurrenceType = RecurrenceType.NONE
 )

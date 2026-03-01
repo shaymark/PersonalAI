@@ -4,23 +4,33 @@ import android.app.NotificationManager
 import android.content.Context
 import androidx.core.app.NotificationCompat
 import androidx.hilt.work.HiltWorker
+import androidx.work.Constraints
 import androidx.work.CoroutineWorker
+import androidx.work.Data
+import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.personal.personalai.domain.model.Message
 import com.personal.personalai.domain.model.MessageRole
 import com.personal.personalai.domain.model.OutputTarget
+import com.personal.personalai.domain.model.RecurrenceType
 import com.personal.personalai.domain.model.TaskType
 import com.personal.personalai.domain.repository.AiRepository
 import com.personal.personalai.domain.repository.ChatRepository
+import com.personal.personalai.domain.repository.TaskRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
+import java.util.concurrent.TimeUnit
 
 @HiltWorker
 class TaskReminderWorker @AssistedInject constructor(
     @Assisted private val context: Context,
     @Assisted workerParams: WorkerParameters,
     private val aiRepository: AiRepository,
-    private val chatRepository: ChatRepository
+    private val chatRepository: ChatRepository,
+    private val taskRepository: TaskRepository,
+    private val workManager: WorkManager
 ) : CoroutineWorker(context, workerParams) {
 
     override suspend fun doWork(): Result {
@@ -29,7 +39,7 @@ class TaskReminderWorker @AssistedInject constructor(
             TaskType.valueOf(inputData.getString(KEY_TASK_TYPE) ?: TaskType.REMINDER.name)
         }.getOrDefault(TaskType.REMINDER)
 
-        return when (taskType) {
+        val workResult = when (taskType) {
             TaskType.REMINDER -> {
                 val description = inputData.getString(KEY_TASK_DESCRIPTION) ?: ""
                 showSimpleNotification(title, description)
@@ -37,6 +47,49 @@ class TaskReminderWorker @AssistedInject constructor(
             }
             TaskType.AI_PROMPT -> handleAiTask(title)
         }
+
+        // After successful execution, reschedule if this is a recurring task
+        if (workResult == Result.success()) {
+            val recurrenceType = runCatching {
+                RecurrenceType.valueOf(inputData.getString(KEY_RECURRENCE_TYPE) ?: RecurrenceType.NONE.name)
+            }.getOrDefault(RecurrenceType.NONE)
+            val taskId = inputData.getLong(KEY_TASK_ID, -1L)
+            if (recurrenceType != RecurrenceType.NONE && taskId != -1L) {
+                scheduleNextOccurrence(taskId, recurrenceType)
+            }
+        }
+
+        return workResult
+    }
+
+    private suspend fun scheduleNextOccurrence(taskId: Long, recurrenceType: RecurrenceType) {
+        val currentScheduledAt = inputData.getLong(KEY_SCHEDULED_AT, System.currentTimeMillis())
+        val intervalMs = if (recurrenceType == RecurrenceType.DAILY) 86_400_000L else 604_800_000L
+        val nextScheduledAt = currentScheduledAt + intervalMs
+        val delayMs = nextScheduledAt - System.currentTimeMillis()
+        if (delayMs <= 0) return  // missed window — skip silently
+
+        val taskTypeName = inputData.getString(KEY_TASK_TYPE) ?: TaskType.REMINDER.name
+        val constraints = when (runCatching { TaskType.valueOf(taskTypeName) }.getOrDefault(TaskType.REMINDER)) {
+            TaskType.AI_PROMPT -> Constraints.Builder()
+                .setRequiredNetworkType(NetworkType.CONNECTED)
+                .build()
+            TaskType.REMINDER -> Constraints.NONE
+        }
+
+        val newRequest = OneTimeWorkRequestBuilder<TaskReminderWorker>()
+            .setInitialDelay(delayMs, TimeUnit.MILLISECONDS)
+            .setConstraints(constraints)
+            .setInputData(
+                Data.Builder()
+                    .putAll(inputData)
+                    .putLong(KEY_SCHEDULED_AT, nextScheduledAt)
+                    .build()
+            )
+            .build()
+
+        workManager.enqueue(newRequest)
+        taskRepository.updateNextOccurrence(taskId, nextScheduledAt, newRequest.id.toString())
     }
 
     private suspend fun handleAiTask(title: String): Result {
@@ -137,5 +190,8 @@ class TaskReminderWorker @AssistedInject constructor(
         const val KEY_TASK_TYPE = "task_type"
         const val KEY_AI_PROMPT = "ai_prompt"
         const val KEY_OUTPUT_TARGET = "output_target"
+        const val KEY_TASK_ID = "task_id"
+        const val KEY_SCHEDULED_AT = "scheduled_at"
+        const val KEY_RECURRENCE_TYPE = "recurrence_type"
     }
 }

@@ -3,6 +3,7 @@ package com.personal.personalai.presentation.schedule
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.personal.personalai.domain.model.OutputTarget
+import com.personal.personalai.domain.model.RecurrenceType
 import com.personal.personalai.domain.model.ScheduledTask
 import com.personal.personalai.domain.model.TaskInfo
 import com.personal.personalai.domain.model.TaskType
@@ -46,22 +47,24 @@ class ScheduledTasksViewModel @Inject constructor(
 
     fun showAddDialog() = _uiState.update {
         it.copy(
-            showAddDialog = true,
+            showAddDialog      = true,
             newTaskScheduledAt = System.currentTimeMillis() + 60 * 60 * 1000L,
-            newTaskType = TaskType.REMINDER,
-            newAiPrompt = "",
-            newOutputTarget = OutputTarget.NOTIFICATION
+            newTaskType        = TaskType.REMINDER,
+            newAiPrompt        = "",
+            newOutputTarget    = OutputTarget.NOTIFICATION,
+            newRecurrenceType  = RecurrenceType.NONE
         )
     }
 
     fun dismissAddDialog() = _uiState.update {
         it.copy(
-            showAddDialog = false,
-            newTaskTitle = "",
+            showAddDialog     = false,
+            newTaskTitle      = "",
             newTaskDescription = "",
-            newTaskType = TaskType.REMINDER,
-            newAiPrompt = "",
-            newOutputTarget = OutputTarget.NOTIFICATION
+            newTaskType       = TaskType.REMINDER,
+            newAiPrompt       = "",
+            newOutputTarget   = OutputTarget.NOTIFICATION,
+            newRecurrenceType = RecurrenceType.NONE
         )
     }
 
@@ -79,6 +82,9 @@ class ScheduledTasksViewModel @Inject constructor(
     fun onOutputTargetChanged(target: OutputTarget) =
         _uiState.update { it.copy(newOutputTarget = target) }
 
+    fun onRecurrenceTypeChanged(recurrence: RecurrenceType) =
+        _uiState.update { it.copy(newRecurrenceType = recurrence) }
+
     fun createTask() {
         val state = _uiState.value
         if (state.newTaskTitle.isBlank()) return
@@ -87,22 +93,24 @@ class ScheduledTasksViewModel @Inject constructor(
             val isoTime = epochToIso(state.newTaskScheduledAt)
             createScheduledTaskUseCase(
                 TaskInfo(
-                    title = state.newTaskTitle,
-                    description = state.newTaskDescription,
+                    title          = state.newTaskTitle,
+                    description    = state.newTaskDescription,
                     scheduledAtIso = isoTime,
-                    taskType = state.newTaskType,
-                    aiPrompt = state.newAiPrompt.takeIf { it.isNotBlank() },
-                    outputTarget = state.newOutputTarget
+                    taskType       = state.newTaskType,
+                    aiPrompt       = state.newAiPrompt.takeIf { it.isNotBlank() },
+                    outputTarget   = state.newOutputTarget,
+                    recurrenceType = state.newRecurrenceType
                 )
             )
             _uiState.update {
                 it.copy(
-                    showAddDialog = false,
-                    newTaskTitle = "",
+                    showAddDialog     = false,
+                    newTaskTitle      = "",
                     newTaskDescription = "",
-                    newTaskType = TaskType.REMINDER,
-                    newAiPrompt = "",
-                    newOutputTarget = OutputTarget.NOTIFICATION
+                    newTaskType       = TaskType.REMINDER,
+                    newAiPrompt       = "",
+                    newOutputTarget   = OutputTarget.NOTIFICATION,
+                    newRecurrenceType = RecurrenceType.NONE
                 )
             }
         }
@@ -120,7 +128,8 @@ class ScheduledTasksViewModel @Inject constructor(
             newTaskScheduledAt = task.scheduledAt,
             newTaskType        = task.taskType,
             newAiPrompt        = task.aiPrompt ?: "",
-            newOutputTarget    = task.outputTarget
+            newOutputTarget    = task.outputTarget,
+            newRecurrenceType  = task.recurrenceType
         )
     }
 
@@ -131,7 +140,8 @@ class ScheduledTasksViewModel @Inject constructor(
             newTaskDescription = "",
             newTaskType        = TaskType.REMINDER,
             newAiPrompt        = "",
-            newOutputTarget    = OutputTarget.NOTIFICATION
+            newOutputTarget    = OutputTarget.NOTIFICATION,
+            newRecurrenceType  = RecurrenceType.NONE
         )
     }
 
@@ -144,12 +154,13 @@ class ScheduledTasksViewModel @Inject constructor(
 
         viewModelScope.launch {
             val updated = task.copy(
-                title        = state.newTaskTitle.trim(),
-                description  = state.newTaskDescription.trim(),
-                scheduledAt  = state.newTaskScheduledAt,
-                taskType     = state.newTaskType,
-                aiPrompt     = state.newAiPrompt.trim().takeIf { it.isNotBlank() },
-                outputTarget = state.newOutputTarget
+                title          = state.newTaskTitle.trim(),
+                description    = state.newTaskDescription.trim(),
+                scheduledAt    = state.newTaskScheduledAt,
+                taskType       = state.newTaskType,
+                aiPrompt       = state.newAiPrompt.trim().takeIf { it.isNotBlank() },
+                outputTarget   = state.newOutputTarget,
+                recurrenceType = state.newRecurrenceType
             )
             updateScheduledTaskUseCase(updated)
             dismissEditDialog()

@@ -4,6 +4,8 @@ enum class TaskType { REMINDER, AI_PROMPT }
 
 enum class OutputTarget { NOTIFICATION, CHAT, BOTH }
 
+enum class RecurrenceType { NONE, DAILY, WEEKLY }
+
 data class ScheduledTask(
     val id: Long = 0,
     val title: String,
@@ -14,5 +16,6 @@ data class ScheduledTask(
     val workerId: String? = null,
     val taskType: TaskType = TaskType.REMINDER,
     val aiPrompt: String? = null,
-    val outputTarget: OutputTarget = OutputTarget.NOTIFICATION
+    val outputTarget: OutputTarget = OutputTarget.NOTIFICATION,
+    val recurrenceType: RecurrenceType = RecurrenceType.NONE
 )

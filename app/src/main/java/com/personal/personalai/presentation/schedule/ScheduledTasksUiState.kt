@@ -1,6 +1,7 @@
 package com.personal.personalai.presentation.schedule
 
 import com.personal.personalai.domain.model.OutputTarget
+import com.personal.personalai.domain.model.RecurrenceType
 import com.personal.personalai.domain.model.ScheduledTask
 import com.personal.personalai.domain.model.TaskType
 
@@ -15,5 +16,6 @@ data class ScheduledTasksUiState(
     val error: String? = null,
     val newTaskType: TaskType = TaskType.REMINDER,
     val newAiPrompt: String = "",
-    val newOutputTarget: OutputTarget = OutputTarget.NOTIFICATION
+    val newOutputTarget: OutputTarget = OutputTarget.NOTIFICATION,
+    val newRecurrenceType: RecurrenceType = RecurrenceType.NONE
 )

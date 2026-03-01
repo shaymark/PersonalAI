@@ -29,7 +29,8 @@ class CreateScheduledTaskUseCase @Inject constructor(
                 scheduledAt = scheduledAt,
                 taskType = taskInfo.taskType,
                 aiPrompt = taskInfo.aiPrompt,
-                outputTarget = taskInfo.outputTarget
+                outputTarget = taskInfo.outputTarget,
+                recurrenceType = taskInfo.recurrenceType
             )
             val taskId = taskRepository.insertTask(task)
 
@@ -51,7 +52,10 @@ class CreateScheduledTaskUseCase @Inject constructor(
                             TaskReminderWorker.KEY_TASK_DESCRIPTION to taskInfo.description,
                             TaskReminderWorker.KEY_TASK_TYPE to taskInfo.taskType.name,
                             TaskReminderWorker.KEY_AI_PROMPT to taskInfo.aiPrompt,
-                            TaskReminderWorker.KEY_OUTPUT_TARGET to taskInfo.outputTarget.name
+                            TaskReminderWorker.KEY_OUTPUT_TARGET to taskInfo.outputTarget.name,
+                            TaskReminderWorker.KEY_TASK_ID to taskId,
+                            TaskReminderWorker.KEY_SCHEDULED_AT to scheduledAt,
+                            TaskReminderWorker.KEY_RECURRENCE_TYPE to taskInfo.recurrenceType.name
                         )
                     )
                     .build()

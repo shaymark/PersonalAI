@@ -3,6 +3,7 @@ package com.personal.personalai.data.local.entity
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import com.personal.personalai.domain.model.OutputTarget
+import com.personal.personalai.domain.model.RecurrenceType
 import com.personal.personalai.domain.model.ScheduledTask
 import com.personal.personalai.domain.model.TaskType
 
@@ -17,7 +18,8 @@ data class ScheduledTaskEntity(
     val workerId: String? = null,
     val taskType: String = TaskType.REMINDER.name,
     val aiPrompt: String? = null,
-    val outputTarget: String = OutputTarget.NOTIFICATION.name
+    val outputTarget: String = OutputTarget.NOTIFICATION.name,
+    val recurrenceType: String = RecurrenceType.NONE.name
 )
 
 fun ScheduledTaskEntity.toDomain() = ScheduledTask(
@@ -30,7 +32,8 @@ fun ScheduledTaskEntity.toDomain() = ScheduledTask(
     workerId = workerId,
     taskType = runCatching { TaskType.valueOf(taskType) }.getOrDefault(TaskType.REMINDER),
     aiPrompt = aiPrompt,
-    outputTarget = runCatching { OutputTarget.valueOf(outputTarget) }.getOrDefault(OutputTarget.NOTIFICATION)
+    outputTarget = runCatching { OutputTarget.valueOf(outputTarget) }.getOrDefault(OutputTarget.NOTIFICATION),
+    recurrenceType = runCatching { RecurrenceType.valueOf(recurrenceType) }.getOrDefault(RecurrenceType.NONE)
 )
 
 fun ScheduledTask.toEntity() = ScheduledTaskEntity(
@@ -43,5 +46,6 @@ fun ScheduledTask.toEntity() = ScheduledTaskEntity(
     workerId = workerId,
     taskType = taskType.name,
     aiPrompt = aiPrompt,
-    outputTarget = outputTarget.name
+    outputTarget = outputTarget.name,
+    recurrenceType = recurrenceType.name
 )
