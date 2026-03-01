@@ -180,12 +180,17 @@ class TaskReminderWorker @AssistedInject constructor(
     // ── Tag stripping ────────────────────────────────────────────────────────
 
     private fun stripTags(response: String): String =
-        response
-            .replace(Regex("""\s*\[TASK:\{[^\]]*}]"""), "")
-            .replace(Regex("""\s*\[MEMORY:\{[^\]]*}]"""), "")
-            .replace(Regex("""\s*\[FORGET:\{[^\]]*}]"""), "")
-            .replace(Regex("""\s*\[FORGET_ALL]"""), "")
-            .trim()
+        try {
+            response
+                .replace(Regex("""\s*\[TASK:\{[^\]]*\}\]"""), "")
+                .replace(Regex("""\s*\[MEMORY:\{[^\]]*\}\]"""), "")
+                .replace(Regex("""\s*\[FORGET:\{[^\]]*\}\]"""), "")
+                .replace(Regex("""\s*\[FORGET_ALL\]"""), "")
+                .trim()
+        } catch (e: Exception) {
+            Log.e(TAG, "stripTags failed — returning raw response: ${e.message}", e)
+            response.trim()
+        }
 
     companion object {
         private const val TAG = "TaskReminderWorker"
