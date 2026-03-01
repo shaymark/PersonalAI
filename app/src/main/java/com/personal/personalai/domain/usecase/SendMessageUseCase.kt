@@ -2,8 +2,10 @@ package com.personal.personalai.domain.usecase
 
 import com.personal.personalai.domain.model.Message
 import com.personal.personalai.domain.model.MessageRole
+import com.personal.personalai.domain.model.OutputTarget
 import com.personal.personalai.domain.model.SendMessageResult
 import com.personal.personalai.domain.model.TaskInfo
+import com.personal.personalai.domain.model.TaskType
 import com.personal.personalai.domain.repository.AiRepository
 import com.personal.personalai.domain.repository.ChatRepository
 import kotlinx.coroutines.flow.first
@@ -67,7 +69,21 @@ class SendMessageUseCase @Inject constructor(
         val title = extractJsonString(json, "title") ?: return null
         val description = extractJsonString(json, "description") ?: ""
         val scheduledAt = extractJsonString(json, "scheduledAt") ?: return null
-        return TaskInfo(title = title, description = description, scheduledAtIso = scheduledAt)
+        val taskType = runCatching {
+            TaskType.valueOf(extractJsonString(json, "taskType") ?: TaskType.REMINDER.name)
+        }.getOrDefault(TaskType.REMINDER)
+        val aiPrompt = extractJsonString(json, "aiPrompt")
+        val outputTarget = runCatching {
+            OutputTarget.valueOf(extractJsonString(json, "outputTarget") ?: OutputTarget.NOTIFICATION.name)
+        }.getOrDefault(OutputTarget.NOTIFICATION)
+        return TaskInfo(
+            title = title,
+            description = description,
+            scheduledAtIso = scheduledAt,
+            taskType = taskType,
+            aiPrompt = aiPrompt,
+            outputTarget = outputTarget
+        )
     }
 
     private fun parseMemoryFromResponse(response: String): MemoryInfo? {

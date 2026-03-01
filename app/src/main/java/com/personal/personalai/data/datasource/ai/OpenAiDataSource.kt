@@ -37,11 +37,21 @@ class OpenAiDataSource @Inject constructor(
             live data, or anything that benefits from searching the internet, use your web
             search capability to find up-to-date information.
             {{MEMORIES_SECTION}}
-            IMPORTANT — Task scheduling: When the user wants to schedule a reminder or task
-            (e.g. "remind me to...", "schedule a...", "set a reminder for...", "notify me..."),
+            IMPORTANT — Reminder scheduling: When the user wants a simple reminder or notification
+            (e.g. "remind me to...", "set a reminder for...", "notify me when..."),
             respond helpfully AND append this tag at the very END of your response, on its own line:
-            [TASK:{"title":"<short task title>","description":"<brief description>","scheduledAt":"<ISO datetime like 2024-01-15T14:30:00>"}]
-            For scheduledAt, infer the time from context. Default to 1 hour from now if unspecified.
+            [TASK:{"title":"<short title>","description":"<brief description>","scheduledAt":"<ISO datetime like 2024-01-15T14:30:00>"}]
+
+            IMPORTANT — AI Task scheduling: When the user wants to schedule the AI to automatically
+            run a prompt at a future time and deliver the result
+            (e.g. "summarize the news for me at 9am", "every morning give me a weather briefing",
+            "schedule the AI to give me a motivational quote at 8pm",
+            "have the AI check the news tomorrow at 7am"),
+            respond helpfully AND append this tag at the very END of your response, on its own line:
+            [TASK:{"title":"<short title>","description":"<brief description>","scheduledAt":"<ISO datetime>","taskType":"AI_PROMPT","aiPrompt":"<the exact prompt the AI should run>","outputTarget":"<NOTIFICATION|CHAT|BOTH>"}]
+            Choose outputTarget based on context: NOTIFICATION for a push notification with the result,
+            CHAT to add the result to the chat window, BOTH for both. Default to NOTIFICATION.
+            For scheduledAt in both cases, infer the time from context. Default to 1 hour from now if unspecified.
 
             IMPORTANT — Memory: When the user asks you to remember something
             (e.g. "remember that my name is...", "remember I prefer...", "keep in mind..."),

@@ -30,6 +30,15 @@ class MockAiDataSource @Inject constructor() {
                     "Done! I've cleared everything I remember about you.\n[FORGET_ALL]"
                 )
 
+            // AI Task scheduling
+            lower.containsAny(
+                "schedule the ai", "have the ai", "ask the ai to", "ai task",
+                "ai to run", "automatically run", "give me a briefing", "daily briefing",
+                "daily summary", "morning briefing", "morning summary", "evening briefing",
+                "schedule ai", "let the ai"
+            ) ->
+                generateAiTaskResponse(message)
+
             // Task scheduling
             lower.containsAny("remind me", "set a reminder", "schedule a", "don't forget to", "notify me") ->
                 generateTaskResponse(message)
@@ -151,6 +160,39 @@ class MockAiDataSource @Inject constructor() {
             "\"description\":\"Reminder from your AI assistant\"," +
             "\"scheduledAt\":\"$isoTime\"}]"
         return Result.success(response)
+    }
+
+    private fun generateAiTaskResponse(message: String): Result<String> {
+        val prompt = extractAiPrompt(message)
+        val title = "Scheduled AI Task"
+        val scheduledAt = System.currentTimeMillis() + 60 * 60 * 1000L
+        val isoTime = formatEpochToIso(scheduledAt)
+        val response =
+            "Got it! I've scheduled an AI task that will run automatically in about 1 hour.\n\n" +
+            "The AI will run: \"$prompt\"\n\n" +
+            "You'll receive the result as a notification. Note: in mock mode, no real AI call will be made — " +
+            "add your OpenAI API key in ⚙️ Settings to enable live AI tasks.\n" +
+            "[TASK:{\"title\":\"$title\"," +
+            "\"description\":\"Scheduled AI task\"," +
+            "\"scheduledAt\":\"$isoTime\"," +
+            "\"taskType\":\"AI_PROMPT\"," +
+            "\"aiPrompt\":\"$prompt\"," +
+            "\"outputTarget\":\"NOTIFICATION\"}]"
+        return Result.success(response)
+    }
+
+    private fun extractAiPrompt(message: String): String {
+        val patterns = listOf(
+            Regex("schedule the ai to (.+?)(?:\\.|!|\\?|$)", RegexOption.IGNORE_CASE),
+            Regex("have the ai (.+?)(?:\\.|!|\\?|$)", RegexOption.IGNORE_CASE),
+            Regex("ask the ai to (.+?)(?:\\.|!|\\?|$)", RegexOption.IGNORE_CASE),
+            Regex("let the ai (.+?)(?:\\.|!|\\?|$)", RegexOption.IGNORE_CASE),
+        )
+        for (pattern in patterns) {
+            val match = pattern.find(message)
+            if (match != null) return match.groupValues[1].trim().removeSuffix(".").trim()
+        }
+        return message.trim()
     }
 
     private fun extractTaskTitle(message: String): String {
