@@ -34,9 +34,15 @@ val MIGRATION_2_3 = object : Migration(2, 3) {
     }
 }
 
+val MIGRATION_3_4 = object : Migration(3, 4) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        database.execSQL("ALTER TABLE scheduled_tasks ADD COLUMN recurrenceType TEXT NOT NULL DEFAULT 'NONE'")
+    }
+}
+
 @Database(
     entities = [MessageEntity::class, ScheduledTaskEntity::class, MemoryEntity::class],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class PersonalAIDatabase : RoomDatabase() {

@@ -3,6 +3,7 @@ package com.personal.personalai.domain.usecase
 import com.personal.personalai.domain.model.Message
 import com.personal.personalai.domain.model.MessageRole
 import com.personal.personalai.domain.model.OutputTarget
+import com.personal.personalai.domain.model.RecurrenceType
 import com.personal.personalai.domain.model.SendMessageResult
 import com.personal.personalai.domain.model.TaskInfo
 import com.personal.personalai.domain.model.TaskType
@@ -76,13 +77,17 @@ class SendMessageUseCase @Inject constructor(
         val outputTarget = runCatching {
             OutputTarget.valueOf(extractJsonString(json, "outputTarget") ?: OutputTarget.NOTIFICATION.name)
         }.getOrDefault(OutputTarget.NOTIFICATION)
+        val recurrenceType = runCatching {
+            RecurrenceType.valueOf(extractJsonString(json, "recurrenceType") ?: RecurrenceType.NONE.name)
+        }.getOrDefault(RecurrenceType.NONE)
         return TaskInfo(
             title = title,
             description = description,
             scheduledAtIso = scheduledAt,
             taskType = taskType,
             aiPrompt = aiPrompt,
-            outputTarget = outputTarget
+            outputTarget = outputTarget,
+            recurrenceType = recurrenceType
         )
     }
 

@@ -30,6 +30,17 @@ class MockAiDataSource @Inject constructor() {
                     "Done! I've cleared everything I remember about you.\n[FORGET_ALL]"
                 )
 
+            // Recurring tasks (check before single-shot task/AI-task branches)
+            lower.containsAny(
+                "every day", "every morning", "every evening", "every night",
+                "daily reminder", "remind me daily", "remind me every",
+                "every week", "weekly reminder",
+                "every monday", "every tuesday", "every wednesday", "every thursday",
+                "every friday", "every saturday", "every sunday",
+                "each day", "each morning", "each week"
+            ) ->
+                generateRecurringTaskResponse(message)
+
             // AI Task scheduling
             lower.containsAny(
                 "schedule the ai", "have the ai", "ask the ai to", "ai task",
@@ -147,6 +158,50 @@ class MockAiDataSource @Inject constructor() {
         message.contains("job", ignoreCase = true) || message.contains("work", ignoreCase = true) -> "work"
         message.contains("age", ignoreCase = true) || message.contains("born", ignoreCase = true) -> "personal"
         else -> "general"
+    }
+
+    private fun generateRecurringTaskResponse(message: String): Result<String> {
+        val lower = message.lowercase()
+        val recurrenceType = if (lower.containsAny(
+                "every week", "weekly", "every monday", "every tuesday", "every wednesday",
+                "every thursday", "every friday", "every saturday", "every sunday", "each week"
+            )) "WEEKLY" else "DAILY"
+
+        val isAiTask = lower.containsAny(
+            "schedule the ai", "have the ai", "ai to", "give me a briefing",
+            "give me a summary", "tell me", "check the", "what are", "briefing", "summary"
+        )
+        val scheduledAt = System.currentTimeMillis() + 60 * 60 * 1000L
+        val isoTime = formatEpochToIso(scheduledAt)
+        val recurrenceLabel = if (recurrenceType == "DAILY") "daily" else "weekly"
+
+        return if (isAiTask) {
+            val prompt = extractAiPrompt(message).ifBlank { message.trim() }
+            val title = "Recurring AI Task"
+            Result.success(
+                "Got it! I've scheduled a recurring AI task that will run $recurrenceLabel.\n\n" +
+                "The AI will: \"$prompt\"\n\n" +
+                "You'll receive the result as a notification. Note: in mock mode, no real AI call " +
+                "will be made — add your OpenAI API key in ⚙️ Settings to enable live AI tasks.\n" +
+                "[TASK:{\"title\":\"$title\"," +
+                "\"description\":\"Recurring AI task\"," +
+                "\"scheduledAt\":\"$isoTime\"," +
+                "\"taskType\":\"AI_PROMPT\"," +
+                "\"aiPrompt\":\"$prompt\"," +
+                "\"outputTarget\":\"NOTIFICATION\"," +
+                "\"recurrenceType\":\"$recurrenceType\"}]"
+            )
+        } else {
+            val title = extractTaskTitle(message).ifBlank { "Recurring Reminder" }
+            Result.success(
+                "Sure! I've set up a $recurrenceLabel recurring reminder: \"$title\".\n" +
+                "You'll get the first notification in about 1 hour, then $recurrenceLabel after that.\n" +
+                "[TASK:{\"title\":\"$title\"," +
+                "\"description\":\"Recurring reminder\"," +
+                "\"scheduledAt\":\"$isoTime\"," +
+                "\"recurrenceType\":\"$recurrenceType\"}]"
+            )
+        }
     }
 
     private fun generateTaskResponse(message: String): Result<String> {

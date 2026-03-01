@@ -8,6 +8,7 @@ import androidx.room.Room
 import androidx.work.WorkManager
 import com.personal.personalai.data.local.MIGRATION_1_2
 import com.personal.personalai.data.local.MIGRATION_2_3
+import com.personal.personalai.data.local.MIGRATION_3_4
 import com.personal.personalai.data.local.PersonalAIDatabase
 import com.personal.personalai.data.local.dao.MemoryDao
 import com.personal.personalai.data.local.dao.MessageDao
@@ -40,7 +41,7 @@ object DatabaseModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): PersonalAIDatabase =
         Room.databaseBuilder(context, PersonalAIDatabase::class.java, "personal_ai_db")
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
             .build()
 
     @Provides

@@ -29,4 +29,7 @@ interface ScheduledTaskDao {
 
     @Query("UPDATE scheduled_tasks SET workerId = :workerId WHERE id = :taskId")
     suspend fun updateWorkerId(taskId: Long, workerId: String)
+
+    @Query("UPDATE scheduled_tasks SET workerId = :workerId, scheduledAt = :scheduledAt WHERE id = :id")
+    suspend fun updateNextOccurrence(id: Long, scheduledAt: Long, workerId: String)
 }

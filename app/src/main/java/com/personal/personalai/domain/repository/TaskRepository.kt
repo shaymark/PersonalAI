@@ -10,4 +10,5 @@ interface TaskRepository {
     suspend fun markCompleted(taskId: Long)
     suspend fun updateTask(task: ScheduledTask)
     suspend fun updateWorkerId(taskId: Long, workerId: String)
+    suspend fun updateNextOccurrence(taskId: Long, scheduledAt: Long, workerId: String)
 }

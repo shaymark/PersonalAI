@@ -46,7 +46,10 @@ class UpdateScheduledTaskUseCase @Inject constructor(
                             TaskReminderWorker.KEY_TASK_DESCRIPTION to updatedTask.description,
                             TaskReminderWorker.KEY_TASK_TYPE to updatedTask.taskType.name,
                             TaskReminderWorker.KEY_AI_PROMPT to updatedTask.aiPrompt,
-                            TaskReminderWorker.KEY_OUTPUT_TARGET to updatedTask.outputTarget.name
+                            TaskReminderWorker.KEY_OUTPUT_TARGET to updatedTask.outputTarget.name,
+                            TaskReminderWorker.KEY_TASK_ID to updatedTask.id,
+                            TaskReminderWorker.KEY_SCHEDULED_AT to updatedTask.scheduledAt,
+                            TaskReminderWorker.KEY_RECURRENCE_TYPE to updatedTask.recurrenceType.name
                         )
                     )
                     .build()
