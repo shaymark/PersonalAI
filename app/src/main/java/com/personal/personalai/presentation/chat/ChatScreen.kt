@@ -6,6 +6,14 @@ import android.content.Intent
 import android.speech.RecognizerIntent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.StartOffset
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.keyframes
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,12 +23,14 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -245,6 +255,28 @@ private fun MessageBubble(message: Message) {
 
 @Composable
 private fun TypingIndicator() {
+    val infiniteTransition = rememberInfiniteTransition(label = "typing")
+
+    // Three dots with staggered 150 ms delays — creates a left-to-right wave
+    val dotOffsets = listOf(0, 150, 300).map { delayMs ->
+        infiniteTransition.animateFloat(
+            initialValue = 0f,
+            targetValue = -8f,
+            animationSpec = infiniteRepeatable(
+                animation = keyframes {
+                    durationMillis = 900
+                    0f  at 0   using LinearEasing
+                    -8f at 300 using LinearEasing
+                    0f  at 600 using LinearEasing
+                    0f  at 900
+                },
+                repeatMode = RepeatMode.Restart,
+                initialStartOffset = StartOffset(delayMs)
+            ),
+            label = "dot_$delayMs"
+        )
+    }
+
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.Start
@@ -253,12 +285,23 @@ private fun TypingIndicator() {
             shape = RoundedCornerShape(16.dp, 16.dp, 16.dp, 4.dp),
             color = MaterialTheme.colorScheme.surfaceVariant
         ) {
-            Text(
-                text = "• • •",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
-            )
+            Row(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                dotOffsets.forEach { offsetState ->
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .offset(y = offsetState.value.dp)
+                            .background(
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                shape = CircleShape
+                            )
+                    )
+                }
+            }
         }
     }
 }
