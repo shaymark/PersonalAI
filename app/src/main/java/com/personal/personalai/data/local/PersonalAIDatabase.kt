@@ -26,9 +26,17 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
     }
 }
 
+val MIGRATION_2_3 = object : Migration(2, 3) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        database.execSQL("ALTER TABLE scheduled_tasks ADD COLUMN taskType TEXT NOT NULL DEFAULT 'REMINDER'")
+        database.execSQL("ALTER TABLE scheduled_tasks ADD COLUMN aiPrompt TEXT")
+        database.execSQL("ALTER TABLE scheduled_tasks ADD COLUMN outputTarget TEXT NOT NULL DEFAULT 'NOTIFICATION'")
+    }
+}
+
 @Database(
     entities = [MessageEntity::class, ScheduledTaskEntity::class, MemoryEntity::class],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class PersonalAIDatabase : RoomDatabase() {

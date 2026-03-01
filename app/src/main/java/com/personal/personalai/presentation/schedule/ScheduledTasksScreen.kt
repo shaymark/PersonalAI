@@ -34,10 +34,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.personal.personalai.domain.model.OutputTarget
 import com.personal.personalai.domain.model.ScheduledTask
+import com.personal.personalai.domain.model.TaskType
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -97,6 +100,9 @@ fun ScheduledTasksScreen(
             onTitleChanged = viewModel::onTitleChanged,
             onDescriptionChanged = viewModel::onDescriptionChanged,
             onScheduledAtChanged = viewModel::onScheduledAtChanged,
+            onTaskTypeChanged = viewModel::onTaskTypeChanged,
+            onAiPromptChanged = viewModel::onAiPromptChanged,
+            onOutputTargetChanged = viewModel::onOutputTargetChanged,
             onConfirm = viewModel::createTask,
             onDismiss = viewModel::dismissAddDialog
         )
@@ -148,16 +154,30 @@ private fun TaskCard(task: ScheduledTask, onDelete: () -> Unit) {
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            if (task.taskType == TaskType.AI_PROMPT) {
+                Text(
+                    text = "🤖",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(end = 8.dp)
+                )
+            }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = task.title,
                     style = MaterialTheme.typography.titleMedium
                 )
-                if (task.description.isNotBlank()) {
+                val subtitle = if (task.taskType == TaskType.AI_PROMPT) {
+                    task.aiPrompt
+                } else {
+                    task.description.ifBlank { null }
+                }
+                if (subtitle != null) {
                     Text(
-                        text = task.description,
+                        text = subtitle,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
                 Text(
@@ -184,6 +204,9 @@ private fun AddTaskDialog(
     onTitleChanged: (String) -> Unit,
     onDescriptionChanged: (String) -> Unit,
     onScheduledAtChanged: (Long) -> Unit,
+    onTaskTypeChanged: (TaskType) -> Unit,
+    onAiPromptChanged: (String) -> Unit,
+    onOutputTargetChanged: (OutputTarget) -> Unit,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -192,6 +215,7 @@ private fun AddTaskDialog(
         title = { Text("Add Scheduled Task") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                // Title
                 OutlinedTextField(
                     value = uiState.newTaskTitle,
                     onValueChange = onTitleChanged,
@@ -199,38 +223,83 @@ private fun AddTaskDialog(
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
-                OutlinedTextField(
-                    value = uiState.newTaskDescription,
-                    onValueChange = onDescriptionChanged,
-                    label = { Text("Description (optional)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    maxLines = 2
-                )
+
+                // Task type selector
+                Text("Task Type", style = MaterialTheme.typography.labelMedium)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = uiState.newTaskType == TaskType.REMINDER,
+                        onClick = { onTaskTypeChanged(TaskType.REMINDER) },
+                        label = { Text("Reminder") }
+                    )
+                    FilterChip(
+                        selected = uiState.newTaskType == TaskType.AI_PROMPT,
+                        onClick = { onTaskTypeChanged(TaskType.AI_PROMPT) },
+                        label = { Text("AI Task") }
+                    )
+                }
+
+                // Conditional: description for Reminder, prompt + output for AI Task
+                if (uiState.newTaskType == TaskType.REMINDER) {
+                    OutlinedTextField(
+                        value = uiState.newTaskDescription,
+                        onValueChange = onDescriptionChanged,
+                        label = { Text("Description (optional)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        maxLines = 2
+                    )
+                } else {
+                    OutlinedTextField(
+                        value = uiState.newAiPrompt,
+                        onValueChange = onAiPromptChanged,
+                        label = { Text("Prompt *") },
+                        placeholder = { Text("e.g. What are today's top news headlines?") },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 2,
+                        maxLines = 4
+                    )
+                    Text("Deliver to", style = MaterialTheme.typography.labelMedium)
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        FilterChip(
+                            selected = uiState.newOutputTarget == OutputTarget.NOTIFICATION,
+                            onClick = { onOutputTargetChanged(OutputTarget.NOTIFICATION) },
+                            label = { Text("Notification") }
+                        )
+                        FilterChip(
+                            selected = uiState.newOutputTarget == OutputTarget.CHAT,
+                            onClick = { onOutputTargetChanged(OutputTarget.CHAT) },
+                            label = { Text("Chat") }
+                        )
+                        FilterChip(
+                            selected = uiState.newOutputTarget == OutputTarget.BOTH,
+                            onClick = { onOutputTargetChanged(OutputTarget.BOTH) },
+                            label = { Text("Both") }
+                        )
+                    }
+                }
+
+                // Time display
                 Text(
                     "Scheduled: ${formatScheduledTime(uiState.newTaskScheduledAt)}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+
+                // Quick-time chips
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     FilterChip(
                         selected = false,
-                        onClick = {
-                            onScheduledAtChanged(System.currentTimeMillis() + 30 * 60 * 1000L)
-                        },
+                        onClick = { onScheduledAtChanged(System.currentTimeMillis() + 30 * 60 * 1000L) },
                         label = { Text("30 min") }
                     )
                     FilterChip(
                         selected = false,
-                        onClick = {
-                            onScheduledAtChanged(System.currentTimeMillis() + 60 * 60 * 1000L)
-                        },
+                        onClick = { onScheduledAtChanged(System.currentTimeMillis() + 60 * 60 * 1000L) },
                         label = { Text("1 hour") }
                     )
                     FilterChip(
                         selected = false,
-                        onClick = {
-                            onScheduledAtChanged(System.currentTimeMillis() + 24 * 60 * 60 * 1000L)
-                        },
+                        onClick = { onScheduledAtChanged(System.currentTimeMillis() + 24 * 60 * 60 * 1000L) },
                         label = { Text("1 day") }
                     )
                 }
@@ -239,7 +308,8 @@ private fun AddTaskDialog(
         confirmButton = {
             TextButton(
                 onClick = onConfirm,
-                enabled = uiState.newTaskTitle.isNotBlank()
+                enabled = uiState.newTaskTitle.isNotBlank() &&
+                    (uiState.newTaskType == TaskType.REMINDER || uiState.newAiPrompt.isNotBlank())
             ) { Text("Schedule") }
         },
         dismissButton = {

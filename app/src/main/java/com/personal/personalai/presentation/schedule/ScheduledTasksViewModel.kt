@@ -2,8 +2,10 @@ package com.personal.personalai.presentation.schedule
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.personal.personalai.domain.model.OutputTarget
 import com.personal.personalai.domain.model.ScheduledTask
 import com.personal.personalai.domain.model.TaskInfo
+import com.personal.personalai.domain.model.TaskType
 import com.personal.personalai.domain.usecase.CreateScheduledTaskUseCase
 import com.personal.personalai.domain.usecase.DeleteScheduledTaskUseCase
 import com.personal.personalai.domain.usecase.GetScheduledTasksUseCase
@@ -43,12 +45,22 @@ class ScheduledTasksViewModel @Inject constructor(
     fun showAddDialog() = _uiState.update {
         it.copy(
             showAddDialog = true,
-            newTaskScheduledAt = System.currentTimeMillis() + 60 * 60 * 1000L
+            newTaskScheduledAt = System.currentTimeMillis() + 60 * 60 * 1000L,
+            newTaskType = TaskType.REMINDER,
+            newAiPrompt = "",
+            newOutputTarget = OutputTarget.NOTIFICATION
         )
     }
 
     fun dismissAddDialog() = _uiState.update {
-        it.copy(showAddDialog = false, newTaskTitle = "", newTaskDescription = "")
+        it.copy(
+            showAddDialog = false,
+            newTaskTitle = "",
+            newTaskDescription = "",
+            newTaskType = TaskType.REMINDER,
+            newAiPrompt = "",
+            newOutputTarget = OutputTarget.NOTIFICATION
+        )
     }
 
     fun onTitleChanged(title: String) = _uiState.update { it.copy(newTaskTitle = title) }
@@ -58,19 +70,39 @@ class ScheduledTasksViewModel @Inject constructor(
     fun onScheduledAtChanged(epochMillis: Long) =
         _uiState.update { it.copy(newTaskScheduledAt = epochMillis) }
 
+    fun onTaskTypeChanged(type: TaskType) = _uiState.update { it.copy(newTaskType = type) }
+
+    fun onAiPromptChanged(prompt: String) = _uiState.update { it.copy(newAiPrompt = prompt) }
+
+    fun onOutputTargetChanged(target: OutputTarget) =
+        _uiState.update { it.copy(newOutputTarget = target) }
+
     fun createTask() {
         val state = _uiState.value
         if (state.newTaskTitle.isBlank()) return
+        if (state.newTaskType == TaskType.AI_PROMPT && state.newAiPrompt.isBlank()) return
         viewModelScope.launch {
             val isoTime = epochToIso(state.newTaskScheduledAt)
             createScheduledTaskUseCase(
                 TaskInfo(
                     title = state.newTaskTitle,
                     description = state.newTaskDescription,
-                    scheduledAtIso = isoTime
+                    scheduledAtIso = isoTime,
+                    taskType = state.newTaskType,
+                    aiPrompt = state.newAiPrompt.takeIf { it.isNotBlank() },
+                    outputTarget = state.newOutputTarget
                 )
             )
-            _uiState.update { it.copy(showAddDialog = false, newTaskTitle = "", newTaskDescription = "") }
+            _uiState.update {
+                it.copy(
+                    showAddDialog = false,
+                    newTaskTitle = "",
+                    newTaskDescription = "",
+                    newTaskType = TaskType.REMINDER,
+                    newAiPrompt = "",
+                    newOutputTarget = OutputTarget.NOTIFICATION
+                )
+            }
         }
     }
 
