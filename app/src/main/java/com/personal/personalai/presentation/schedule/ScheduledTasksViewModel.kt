@@ -120,6 +120,13 @@ class ScheduledTasksViewModel @Inject constructor(
         viewModelScope.launch { deleteScheduledTaskUseCase(task) }
     }
 
+    /** Deletes the task currently open in the edit dialog, then closes the dialog. */
+    fun deleteEditingTask() {
+        val task = _uiState.value.editingTask ?: return
+        viewModelScope.launch { deleteScheduledTaskUseCase(task) }
+        dismissEditDialog()
+    }
+
     fun showEditDialog(task: ScheduledTask) = _uiState.update {
         it.copy(
             editingTask        = task,
