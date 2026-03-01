@@ -44,7 +44,7 @@ class ScheduledTasksScreenTest {
     @Test
     fun scheduledTasksScreen_showsEmptyState_whenNoTasks() {
         every { getTasksUseCase() } returns flowOf(emptyList())
-        val viewModel = ScheduledTasksViewModel(getTasksUseCase, createTaskUseCase, deleteTaskUseCase)
+        val viewModel = ScheduledTasksViewModel(getTasksUseCase, createTaskUseCase, deleteTaskUseCase, mockk())
 
         composeRule.setContent {
             PersonalAITheme {
@@ -61,7 +61,7 @@ class ScheduledTasksScreenTest {
     @Test
     fun scheduledTasksScreen_showsFab() {
         every { getTasksUseCase() } returns flowOf(emptyList())
-        val viewModel = ScheduledTasksViewModel(getTasksUseCase, createTaskUseCase, deleteTaskUseCase)
+        val viewModel = ScheduledTasksViewModel(getTasksUseCase, createTaskUseCase, deleteTaskUseCase, mockk())
 
         composeRule.setContent {
             PersonalAITheme {
@@ -82,7 +82,7 @@ class ScheduledTasksScreenTest {
             ScheduledTask(2L, "Call dentist", "", System.currentTimeMillis() + 7200_000L)
         )
         every { getTasksUseCase() } returns flowOf(tasks)
-        val viewModel = ScheduledTasksViewModel(getTasksUseCase, createTaskUseCase, deleteTaskUseCase)
+        val viewModel = ScheduledTasksViewModel(getTasksUseCase, createTaskUseCase, deleteTaskUseCase, mockk())
 
         composeRule.setContent {
             PersonalAITheme {
@@ -100,7 +100,7 @@ class ScheduledTasksScreenTest {
     @Test
     fun scheduledTasksScreen_opensAddDialog_onFabClick() {
         every { getTasksUseCase() } returns flowOf(emptyList())
-        val viewModel = ScheduledTasksViewModel(getTasksUseCase, createTaskUseCase, deleteTaskUseCase)
+        val viewModel = ScheduledTasksViewModel(getTasksUseCase, createTaskUseCase, deleteTaskUseCase, mockk())
 
         composeRule.setContent {
             PersonalAITheme {
@@ -118,7 +118,7 @@ class ScheduledTasksScreenTest {
     @Test
     fun scheduledTasksScreen_showsTopAppBarTitle() {
         every { getTasksUseCase() } returns flowOf(emptyList())
-        val viewModel = ScheduledTasksViewModel(getTasksUseCase, createTaskUseCase, deleteTaskUseCase)
+        val viewModel = ScheduledTasksViewModel(getTasksUseCase, createTaskUseCase, deleteTaskUseCase, mockk())
 
         composeRule.setContent {
             PersonalAITheme {

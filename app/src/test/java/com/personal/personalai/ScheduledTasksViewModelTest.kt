@@ -41,7 +41,7 @@ class ScheduledTasksViewModelTest {
         createTaskUseCase = mockk()
         deleteTaskUseCase = mockk()
         every { getTasksUseCase() } returns flowOf(emptyList())
-        viewModel = ScheduledTasksViewModel(getTasksUseCase, createTaskUseCase, deleteTaskUseCase)
+        viewModel = ScheduledTasksViewModel(getTasksUseCase, createTaskUseCase, deleteTaskUseCase, mockk())
     }
 
     @After
@@ -125,7 +125,7 @@ class ScheduledTasksViewModelTest {
             ScheduledTask(2L, "Task 2", "", System.currentTimeMillis())
         )
         every { getTasksUseCase() } returns flowOf(tasks)
-        viewModel = ScheduledTasksViewModel(getTasksUseCase, createTaskUseCase, deleteTaskUseCase)
+        viewModel = ScheduledTasksViewModel(getTasksUseCase, createTaskUseCase, deleteTaskUseCase, mockk())
 
         advanceUntilIdle()
         assertEquals(2, viewModel.uiState.value.tasks.size)

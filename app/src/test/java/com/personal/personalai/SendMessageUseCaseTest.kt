@@ -36,7 +36,7 @@ class SendMessageUseCaseTest {
         createScheduledTaskUseCase = mockk()
         every { chatRepository.getMessages() } returns flowOf(emptyList())
         coEvery { chatRepository.saveMessage(any()) } returns 1L
-        useCase = SendMessageUseCase(aiRepository, chatRepository, createScheduledTaskUseCase)
+        useCase = SendMessageUseCase(aiRepository, chatRepository, createScheduledTaskUseCase, mockk(), mockk(), mockk())
     }
 
     @Test
