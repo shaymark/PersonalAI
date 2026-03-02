@@ -13,10 +13,12 @@ import com.personal.personalai.data.local.PersonalAIDatabase
 import com.personal.personalai.data.local.dao.MemoryDao
 import com.personal.personalai.data.local.dao.MessageDao
 import com.personal.personalai.data.local.dao.ScheduledTaskDao
+import com.personal.personalai.data.audio.AudioRecorderImpl
 import com.personal.personalai.data.repository.AiRepositoryImpl
 import com.personal.personalai.data.repository.ChatRepositoryImpl
 import com.personal.personalai.data.repository.MemoryRepositoryImpl
 import com.personal.personalai.data.repository.TaskRepositoryImpl
+import com.personal.personalai.domain.audio.AudioRecorder
 import com.personal.personalai.domain.repository.AiRepository
 import com.personal.personalai.domain.repository.ChatRepository
 import com.personal.personalai.domain.repository.MemoryRepository
@@ -76,6 +78,10 @@ object DatabaseModule {
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class RepositoryModule {
+
+    @Binds
+    @Singleton
+    abstract fun bindAudioRecorder(impl: AudioRecorderImpl): AudioRecorder
 
     @Binds
     @Singleton

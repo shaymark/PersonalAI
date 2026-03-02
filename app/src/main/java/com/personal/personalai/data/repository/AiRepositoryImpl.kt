@@ -4,12 +4,14 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import com.personal.personalai.data.datasource.ai.MockAiDataSource
 import com.personal.personalai.data.datasource.ai.OpenAiDataSource
+import com.personal.personalai.data.datasource.ai.WhisperDataSource
 import com.personal.personalai.domain.model.Message
 import com.personal.personalai.domain.model.MessageRole
 import com.personal.personalai.domain.repository.AiRepository
 import com.personal.personalai.domain.repository.MemoryRepository
 import com.personal.personalai.presentation.settings.PreferencesKeys
 import kotlinx.coroutines.flow.first
+import java.io.File
 import javax.inject.Inject
 
 /**
@@ -25,6 +27,7 @@ import javax.inject.Inject
 class AiRepositoryImpl @Inject constructor(
     private val openAiDataSource: OpenAiDataSource,
     private val mockAiDataSource: MockAiDataSource,
+    private val whisperDataSource: WhisperDataSource,
     private val dataStore: DataStore<Preferences>,
     private val memoryRepository: MemoryRepository
 ) : AiRepository {
@@ -44,6 +47,15 @@ class AiRepositoryImpl @Inject constructor(
                 chatHistory + Message(content = message, role = MessageRole.USER)
             }
             openAiDataSource.sendMessage(apiKey, inputHistory, memories)
+        }
+    }
+
+    override suspend fun transcribeAudio(audioFile: File): Result<String> {
+        val apiKey = dataStore.data.first()[PreferencesKeys.API_KEY].orEmpty()
+        return if (apiKey.isBlank()) {
+            Result.failure(Exception("Whisper requires an OpenAI API key. Add one in Settings."))
+        } else {
+            whisperDataSource.transcribe(apiKey, audioFile)
         }
     }
 }

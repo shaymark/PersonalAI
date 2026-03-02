@@ -1,11 +1,10 @@
 package com.personal.personalai.presentation.chat
 
-import android.app.Activity
-import android.content.ActivityNotFoundException
-import android.content.Intent
-import android.speech.RecognizerIntent
+import android.Manifest
+import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.StartOffset
@@ -13,7 +12,9 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -39,6 +40,7 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -57,8 +59,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.personal.personalai.domain.model.Message
@@ -77,16 +84,14 @@ fun ChatScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
     val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
 
-    val speechLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            val text = result.data
-                ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
-                ?.firstOrNull() ?: ""
-            if (text.isNotEmpty()) viewModel.onVoiceInputReceived(text)
-        }
+    // Runtime permission launcher — if denied, surface an error via the existing snackbar path
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (!isGranted) viewModel.showPermissionDeniedError()
+        // If granted the user simply presses the mic again — standard Android convention
     }
 
     LaunchedEffect(uiState.messages.size) {
@@ -147,19 +152,18 @@ fun ChatScreen(
                 text = uiState.inputText,
                 onTextChanged = viewModel::onInputChanged,
                 onSend = viewModel::sendMessage,
-                onMicClick = {
-                    val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                        putExtra(
-                            RecognizerIntent.EXTRA_LANGUAGE_MODEL,
-                            RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
-                        )
-                        putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
-                        putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak your message…")
+                voiceState = uiState.voiceState,
+                onRecordPress = {
+                    if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO)
+                        == PackageManager.PERMISSION_GRANTED
+                    ) {
+                        viewModel.onRecordStart()
+                    } else {
+                        permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
                     }
-                    try {
-                        speechLauncher.launch(intent)
-                    } catch (_: ActivityNotFoundException) { }
                 },
+                onRecordRelease = viewModel::onRecordStop,
+                onRecordCancel = viewModel::onRecordCancel,
                 isLoading = uiState.isLoading,
                 modifier = Modifier.fillMaxWidth()
             )
@@ -185,7 +189,7 @@ private fun WelcomePlaceholder(modifier: Modifier = Modifier) {
                 "Ask me anything, or say \"remind me to…\" and I'll schedule a task for you automatically.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                textAlign = TextAlign.Center
             )
         }
     }
@@ -311,10 +315,25 @@ private fun MessageInputBar(
     text: String,
     onTextChanged: (String) -> Unit,
     onSend: () -> Unit,
-    onMicClick: () -> Unit,
+    voiceState: VoiceState,
+    onRecordPress: () -> Unit,
+    onRecordRelease: () -> Unit,
+    onRecordCancel: () -> Unit,
     isLoading: Boolean,
     modifier: Modifier = Modifier
 ) {
+    // Pulse animation — only visible during RECORDING state
+    val infiniteTransition = rememberInfiniteTransition(label = "mic_pulse")
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.35f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(500, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulse"
+    )
+
     Surface(
         modifier = modifier,
         tonalElevation = 4.dp
@@ -336,14 +355,53 @@ private fun MessageInputBar(
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                 keyboardActions = KeyboardActions(onSend = { onSend() })
             )
-            IconButton(onClick = onMicClick, enabled = !isLoading) {
-                Icon(
-                    Icons.Default.Mic,
-                    contentDescription = "Voice input",
-                    tint = if (!isLoading) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.outline
-                )
+
+            // Push-to-talk mic button: hold to record, release to transcribe
+            val micEnabled = !isLoading && voiceState != VoiceState.TRANSCRIBING
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .pointerInput(micEnabled, voiceState) {
+                        if (micEnabled) {
+                            detectTapGestures(
+                                onPress = {
+                                    onRecordPress()
+                                    // tryAwaitRelease() suspends until finger lifts (true)
+                                    // or gesture is cancelled, e.g. finger dragged off (false)
+                                    if (tryAwaitRelease()) {
+                                        onRecordRelease()
+                                    } else {
+                                        onRecordCancel()
+                                    }
+                                }
+                            )
+                        }
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                when (voiceState) {
+                    VoiceState.IDLE -> Icon(
+                        imageVector = Icons.Default.Mic,
+                        contentDescription = "Hold to record",
+                        tint = if (micEnabled) MaterialTheme.colorScheme.primary
+                               else MaterialTheme.colorScheme.outline
+                    )
+                    VoiceState.RECORDING -> Icon(
+                        imageVector = Icons.Default.Mic,
+                        contentDescription = "Recording…",
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.graphicsLayer {
+                            scaleX = pulseScale
+                            scaleY = pulseScale
+                        }
+                    )
+                    VoiceState.TRANSCRIBING -> CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        strokeWidth = 2.dp
+                    )
+                }
             }
+
             IconButton(
                 onClick = onSend,
                 enabled = text.isNotBlank() && !isLoading
