@@ -101,11 +101,6 @@ class ChatViewModel @Inject constructor(
         _uiState.update { it.copy(voiceState = VoiceState.IDLE) }
     }
 
-    /** Called when the runtime microphone permission is denied. */
-    fun showPermissionDeniedError() {
-        _uiState.update { it.copy(error = "Microphone permission required. Please grant it and try again.") }
-    }
-
     fun dismissError() {
         _uiState.update { it.copy(error = null) }
     }
