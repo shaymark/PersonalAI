@@ -59,8 +59,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
@@ -88,22 +86,13 @@ fun ChatScreen(
     val listState = rememberLazyListState()
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
-    // coroutineScope is used to show the permission snackbar directly from the
-    // activity-result callback, bypassing ViewModel state. This is necessary because
-    // LaunchedEffect(uiState.error) can silently skip re-triggering when the same
-    // error string is set again during the permission dialog's lifecycle transition.
-    val coroutineScope = rememberCoroutineScope()
 
-    // Runtime permission launcher — shows the snackbar directly from the callback
-    // so it fires reliably on every denial, not just when the state key changes.
+    // Runtime permission launcher — routes denial through ViewModel so the error
+    // surfaces via uiState.error and is shown by the LaunchedEffect below.
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
-        if (!isGranted) {
-            coroutineScope.launch {
-                snackbarHostState.showSnackbar("Microphone permission is required for voice input.")
-            }
-        }
+        if (!isGranted) viewModel.onMicPermissionDenied()
         // If granted: user presses the mic again — standard Android convention
     }
 
