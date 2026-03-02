@@ -14,7 +14,9 @@ import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -59,7 +61,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
@@ -322,16 +323,16 @@ private fun MessageInputBar(
     isLoading: Boolean,
     modifier: Modifier = Modifier
 ) {
-    // Pulse animation — only visible during RECORDING state
+    // Pulse animation for the recording circle background (alpha 15% → 45%)
     val infiniteTransition = rememberInfiniteTransition(label = "mic_pulse")
-    val pulseScale by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = 1.35f,
+    val pulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.15f,
+        targetValue = 0.45f,
         animationSpec = infiniteRepeatable(
-            animation = tween(500, easing = FastOutSlowInEasing),
+            animation = tween(600, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
-        label = "pulse"
+        label = "pulse_alpha"
     )
 
     Surface(
@@ -356,25 +357,29 @@ private fun MessageInputBar(
                 keyboardActions = KeyboardActions(onSend = { onSend() })
             )
 
-            // Push-to-talk mic button: hold to record, release to transcribe
+            // Push-to-talk mic button: hold to record, release to transcribe.
+            // Uses awaitEachGesture + awaitFirstDown + waitForUpOrCancellation —
+            // the correct Compose API for continuous press-and-hold detection.
             val micEnabled = !isLoading && voiceState != VoiceState.TRANSCRIBING
             Box(
                 modifier = Modifier
-                    .size(48.dp)
-                    .pointerInput(micEnabled, voiceState) {
+                    .size(56.dp)               // slightly larger container gives room for the recording circle
+                    .pointerInput(micEnabled) {
                         if (micEnabled) {
-                            detectTapGestures(
-                                onPress = {
-                                    onRecordPress()
-                                    // tryAwaitRelease() suspends until finger lifts (true)
-                                    // or gesture is cancelled, e.g. finger dragged off (false)
-                                    if (tryAwaitRelease()) {
-                                        onRecordRelease()
-                                    } else {
-                                        onRecordCancel()
-                                    }
+                            awaitEachGesture {
+                                // Fires immediately when the finger touches down
+                                awaitFirstDown(requireUnconsumed = false)
+                                onRecordPress()
+                                // Suspends until the finger lifts (non-null) or
+                                // the gesture is cancelled/dragged off (null)
+                                val up = waitForUpOrCancellation()
+                                if (up != null) {
+                                    up.consume()
+                                    onRecordRelease()
+                                } else {
+                                    onRecordCancel()
                                 }
-                            )
+                            }
                         }
                     },
                 contentAlignment = Alignment.Center
@@ -383,20 +388,31 @@ private fun MessageInputBar(
                     VoiceState.IDLE -> Icon(
                         imageVector = Icons.Default.Mic,
                         contentDescription = "Hold to record",
+                        modifier = Modifier.size(26.dp),
                         tint = if (micEnabled) MaterialTheme.colorScheme.primary
                                else MaterialTheme.colorScheme.outline
                     )
-                    VoiceState.RECORDING -> Icon(
-                        imageVector = Icons.Default.Mic,
-                        contentDescription = "Recording…",
-                        tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.graphicsLayer {
-                            scaleX = pulseScale
-                            scaleY = pulseScale
+                    VoiceState.RECORDING -> {
+                        // Pulsing red circle background makes recording state unmistakable
+                        Box(
+                            modifier = Modifier
+                                .size(52.dp)
+                                .background(
+                                    color = MaterialTheme.colorScheme.error.copy(alpha = pulseAlpha),
+                                    shape = CircleShape
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Mic,
+                                contentDescription = "Recording…",
+                                modifier = Modifier.size(34.dp),  // noticeably larger than IDLE
+                                tint = MaterialTheme.colorScheme.error
+                            )
                         }
-                    )
+                    }
                     VoiceState.TRANSCRIBING -> CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
+                        modifier = Modifier.size(26.dp),
                         strokeWidth = 2.dp
                     )
                 }
