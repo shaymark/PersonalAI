@@ -45,7 +45,7 @@ class ChatScreenTest {
 
     @Test
     fun chatScreen_showsWelcomeMessage_whenEmpty() {
-        val viewModel = ChatViewModel(sendMessageUseCase, getChatHistoryUseCase)
+        val viewModel = ChatViewModel(sendMessageUseCase, getChatHistoryUseCase, mockk(), mockk())
         composeRule.setContent {
             PersonalAITheme {
                 ChatScreen(
@@ -61,7 +61,7 @@ class ChatScreenTest {
 
     @Test
     fun chatScreen_showsSettingsButton() {
-        val viewModel = ChatViewModel(sendMessageUseCase, getChatHistoryUseCase)
+        val viewModel = ChatViewModel(sendMessageUseCase, getChatHistoryUseCase, mockk(),mockk())
         composeRule.setContent {
             PersonalAITheme {
                 ChatScreen(
@@ -82,7 +82,7 @@ class ChatScreenTest {
             Message(id = 2, content = "Hi! How can I help?", role = MessageRole.ASSISTANT)
         )
         every { getChatHistoryUseCase() } returns flowOf(messages)
-        val viewModel = ChatViewModel(sendMessageUseCase, getChatHistoryUseCase)
+        val viewModel = ChatViewModel(sendMessageUseCase, getChatHistoryUseCase, mockk(), mockk())
 
         composeRule.setContent {
             PersonalAITheme {
@@ -100,7 +100,7 @@ class ChatScreenTest {
 
     @Test
     fun chatScreen_micAndSendButtonsPresent() {
-        val viewModel = ChatViewModel(sendMessageUseCase, getChatHistoryUseCase)
+        val viewModel = ChatViewModel(sendMessageUseCase, getChatHistoryUseCase, mockk(), mockk())
         composeRule.setContent {
             PersonalAITheme {
                 ChatScreen(
@@ -118,7 +118,7 @@ class ChatScreenTest {
     @Test
     fun chatScreen_navigatesToSettings_onSettingsClick() {
         var navigated = false
-        val viewModel = ChatViewModel(sendMessageUseCase, getChatHistoryUseCase)
+        val viewModel = ChatViewModel(sendMessageUseCase, getChatHistoryUseCase, mockk(), mockk())
         composeRule.setContent {
             PersonalAITheme {
                 ChatScreen(

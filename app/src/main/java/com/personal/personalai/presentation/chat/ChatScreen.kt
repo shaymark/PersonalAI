@@ -120,67 +120,82 @@ fun ChatScreen(
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("PersonalAI") },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                ),
-                actions = {
-                    IconButton(onClick = onNavigateToSettings) {
-                        Icon(Icons.Default.Settings, contentDescription = "Settings")
+    // Wrap in Box so we can position SnackbarHost above the outer bottom navigation bar.
+    // If we leave snackbarHost inside the inner Scaffold, it renders at absolute bottom of
+    // screen and is hidden behind AppNavGraph's NavigationBar. Moving it to a standalone
+    // SnackbarHost with padding(bottom = innerPadding.calculateBottomPadding()) fixes this.
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text("PersonalAI") },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    ),
+                    actions = {
+                        IconButton(onClick = onNavigateToSettings) {
+                            Icon(Icons.Default.Settings, contentDescription = "Settings")
+                        }
                     }
-                }
-            )
-        },
-        snackbarHost = { SnackbarHost(snackbarHostState) }
-    ) { scaffoldPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(scaffoldPadding)
-                .padding(bottom = innerPadding.calculateBottomPadding())
-        ) {
-            if (uiState.messages.isEmpty() && !uiState.isLoading) {
-                WelcomePlaceholder(modifier = Modifier.weight(1f))
-            } else {
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier.weight(1f),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(uiState.messages, key = { it.id }) { message ->
-                        MessageBubble(message = message)
-                    }
-                    if (uiState.isLoading) {
-                        item(key = "loading") { TypingIndicator() }
-                    }
-                }
+                )
             }
-
-            MessageInputBar(
-                text = uiState.inputText,
-                onTextChanged = viewModel::onInputChanged,
-                onSend = viewModel::sendMessage,
-                voiceState = uiState.voiceState,
-                onRecordPress = {
-                    if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO)
-                        == PackageManager.PERMISSION_GRANTED
+        ) { scaffoldPadding ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(scaffoldPadding)
+                    .padding(bottom = innerPadding.calculateBottomPadding())
+            ) {
+                if (uiState.messages.isEmpty() && !uiState.isLoading) {
+                    WelcomePlaceholder(modifier = Modifier.weight(1f))
+                } else {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        viewModel.onRecordStart()
-                    } else {
-                        permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                        items(uiState.messages, key = { it.id }) { message ->
+                            MessageBubble(message = message)
+                        }
+                        if (uiState.isLoading) {
+                            item(key = "loading") { TypingIndicator() }
+                        }
                     }
-                },
-                onRecordRelease = viewModel::onRecordStop,
-                onRecordCancel = viewModel::onRecordCancel,
-                isLoading = uiState.isLoading,
-                modifier = Modifier.fillMaxWidth()
-            )
+                }
+
+                MessageInputBar(
+                    text = uiState.inputText,
+                    onTextChanged = viewModel::onInputChanged,
+                    onSend = viewModel::sendMessage,
+                    voiceState = uiState.voiceState,
+                    onRecordPress = {
+                        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO)
+                            == PackageManager.PERMISSION_GRANTED
+                        ) {
+                            viewModel.onRecordStart()
+                        } else {
+                            permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                        }
+                    },
+                    onRecordRelease = viewModel::onRecordStop,
+                    onRecordCancel = viewModel::onRecordCancel,
+                    isLoading = uiState.isLoading,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
         }
+
+        // Standalone SnackbarHost positioned above the outer bottom navigation bar.
+        // Using innerPadding.calculateBottomPadding() ensures it clears the nav bar
+        // regardless of its height.
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = innerPadding.calculateBottomPadding())
+        )
     }
 }
 
