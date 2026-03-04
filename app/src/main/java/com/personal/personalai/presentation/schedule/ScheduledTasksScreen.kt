@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -251,7 +252,6 @@ private fun TaskDialogContent(
     val futureWarning = if (!isFuture) " " + stringResource(R.string.must_be_future) else ""
 
     Column(
-        modifier = Modifier.verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         // Title
@@ -417,16 +417,22 @@ private fun AddTaskDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.add_task_dialog_title)) },
         text = {
-            TaskDialogContent(
-                uiState = uiState,
-                onTitleChanged = onTitleChanged,
-                onDescriptionChanged = onDescriptionChanged,
-                onScheduledAtChanged = onScheduledAtChanged,
-                onTaskTypeChanged = onTaskTypeChanged,
-                onAiPromptChanged = onAiPromptChanged,
-                onOutputTargetChanged = onOutputTargetChanged,
-                onRecurrenceTypeChanged = onRecurrenceTypeChanged
-            )
+            Column(
+                modifier = Modifier
+                    .heightIn(max = 480.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                TaskDialogContent(
+                    uiState = uiState,
+                    onTitleChanged = onTitleChanged,
+                    onDescriptionChanged = onDescriptionChanged,
+                    onScheduledAtChanged = onScheduledAtChanged,
+                    onTaskTypeChanged = onTaskTypeChanged,
+                    onAiPromptChanged = onAiPromptChanged,
+                    onOutputTargetChanged = onOutputTargetChanged,
+                    onRecurrenceTypeChanged = onRecurrenceTypeChanged
+                )
+            }
         },
         confirmButton = {
             TextButton(
@@ -486,7 +492,9 @@ private fun EditTaskDialog(
         title = { Text(stringResource(R.string.edit_task_dialog_title)) },
         text = {
             Column(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
+                modifier = Modifier
+                    .heightIn(max = 480.dp)
+                    .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 TaskDialogContent(
