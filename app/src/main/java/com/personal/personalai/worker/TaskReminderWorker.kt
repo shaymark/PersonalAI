@@ -17,9 +17,10 @@ import com.personal.personalai.domain.model.MessageRole
 import com.personal.personalai.domain.model.OutputTarget
 import com.personal.personalai.domain.model.RecurrenceType
 import com.personal.personalai.domain.model.TaskType
-import com.personal.personalai.domain.repository.AiRepository
 import com.personal.personalai.domain.repository.ChatRepository
 import com.personal.personalai.domain.repository.TaskRepository
+import com.personal.personalai.domain.usecase.AgentLoopUseCase
+import com.personal.personalai.domain.usecase.AgentStep
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import java.util.concurrent.TimeUnit
@@ -28,7 +29,7 @@ import java.util.concurrent.TimeUnit
 class TaskReminderWorker @AssistedInject constructor(
     @Assisted private val context: Context,
     @Assisted workerParams: WorkerParameters,
-    private val aiRepository: AiRepository,
+    private val agentLoopUseCase: AgentLoopUseCase,
     private val chatRepository: ChatRepository,
     private val taskRepository: TaskRepository,
     private val workManager: WorkManager
@@ -49,7 +50,6 @@ class TaskReminderWorker @AssistedInject constructor(
             TaskType.AI_PROMPT -> handleAiTask(title)
         }
 
-        // After successful execution, reschedule if this is a recurring task
         if (workResult == Result.success()) {
             val recurrenceType = runCatching {
                 RecurrenceType.valueOf(inputData.getString(KEY_RECURRENCE_TYPE) ?: RecurrenceType.NONE.name)
@@ -68,7 +68,7 @@ class TaskReminderWorker @AssistedInject constructor(
         val intervalMs = if (recurrenceType == RecurrenceType.DAILY) 86_400_000L else 604_800_000L
         val nextScheduledAt = currentScheduledAt + intervalMs
         val delayMs = nextScheduledAt - System.currentTimeMillis()
-        if (delayMs <= 0) return  // missed window — skip silently
+        if (delayMs <= 0) return
 
         val taskTypeName = inputData.getString(KEY_TASK_TYPE) ?: TaskType.REMINDER.name
         val constraints = when (runCatching { TaskType.valueOf(taskTypeName) }.getOrDefault(TaskType.REMINDER)) {
@@ -105,22 +105,28 @@ class TaskReminderWorker @AssistedInject constructor(
             OutputTarget.valueOf(inputData.getString(KEY_OUTPUT_TARGET) ?: OutputTarget.NOTIFICATION.name)
         }.getOrDefault(OutputTarget.NOTIFICATION)
 
-        val aiResult = aiRepository.sendMessage(aiPrompt, emptyList())
+        var finalText: String? = null
 
-        return if (aiResult.isSuccess) {
-            val cleanResponse = stripTags(aiResult.getOrThrow())
+        agentLoopUseCase(aiPrompt, backgroundMode = true).collect { step ->
+            when (step) {
+                is AgentStep.ToolCalling -> Log.d(TAG, "Agent tool call: ${step.toolName}")
+                is AgentStep.Complete -> finalText = step.result.getOrNull()
+            }
+        }
+
+        val response = finalText
+        return if (response != null) {
             when (outputTarget) {
-                OutputTarget.NOTIFICATION -> showAiNotification(title, cleanResponse)
-                OutputTarget.CHAT         -> saveToChat(title, cleanResponse)
+                OutputTarget.NOTIFICATION -> showAiNotification(title, response)
+                OutputTarget.CHAT         -> saveToChat(title, response)
                 OutputTarget.BOTH         -> {
-                    showAiNotification(title, cleanResponse)
-                    saveToChat(title, cleanResponse)
+                    showAiNotification(title, response)
+                    saveToChat(title, response)
                 }
             }
             Result.success()
         } else {
-            val error = aiResult.exceptionOrNull()
-            Log.e(TAG, "AI task \"$title\" failed: ${error?.message}", error)
+            Log.e(TAG, "AI task \"$title\" produced no response")
             showFailureNotification(title)
             Result.failure()
         }
@@ -176,21 +182,6 @@ class TaskReminderWorker @AssistedInject constructor(
         )
         chatRepository.saveMessage(message)
     }
-
-    // ── Tag stripping ────────────────────────────────────────────────────────
-
-    private fun stripTags(response: String): String =
-        try {
-            response
-                .replace(Regex("""\s*\[TASK:\{[^\]]*\}\]"""), "")
-                .replace(Regex("""\s*\[MEMORY:\{[^\]]*\}\]"""), "")
-                .replace(Regex("""\s*\[FORGET:\{[^\]]*\}\]"""), "")
-                .replace(Regex("""\s*\[FORGET_ALL\]"""), "")
-                .trim()
-        } catch (e: Exception) {
-            Log.e(TAG, "stripTags failed — returning raw response: ${e.message}", e)
-            response.trim()
-        }
 
     companion object {
         private const val TAG = "TaskReminderWorker"

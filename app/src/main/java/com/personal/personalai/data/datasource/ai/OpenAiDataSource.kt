@@ -3,6 +3,9 @@ package com.personal.personalai.data.datasource.ai
 import com.personal.personalai.domain.model.Memory
 import com.personal.personalai.domain.model.Message
 import com.personal.personalai.domain.model.MessageRole
+import com.personal.personalai.domain.tools.AgentResponse
+import com.personal.personalai.domain.tools.AgentTool
+import com.personal.personalai.domain.tools.FunctionCall
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -16,7 +19,7 @@ import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 
 /**
- * Handles all communication with the OpenAI Chat Completions API.
+ * Handles all communication with the OpenAI Responses API.
  * Requires a valid API key and the user's stored memories on every call.
  * Contains no knowledge of DataStore, mock responses, or key management.
  */
@@ -30,6 +33,7 @@ class OpenAiDataSource @Inject constructor(
         private const val MAX_HISTORY_MESSAGES = 20
         private val MEDIA_TYPE_JSON = "application/json; charset=utf-8".toMediaType()
 
+        /** Used by the legacy sendMessage() path (tag-based, for backward compat). */
         private val SYSTEM_PROMPT_TEMPLATE = """
             You are a helpful personal AI assistant running on an Android app.
             You can answer questions and have natural conversations.
@@ -76,11 +80,35 @@ class OpenAiDataSource @Inject constructor(
             normally with no tags at all.
             Current date and time: {{DATETIME}}
         """.trimIndent()
+
+        /** Used by sendMessageWithTools() — instructs the LLM to use function tools instead of tags. */
+        private val TOOLS_SYSTEM_PROMPT_TEMPLATE = """
+            You are a helpful personal AI assistant running on an Android app.
+            You can answer questions and have natural conversations.
+            You have access to real-time web search. When the user asks about current events,
+            live data, or anything that benefits from searching the internet, use your web
+            search capability to find up-to-date information.
+
+            You have access to powerful tools that let you take real actions for the user:
+            - schedule_task: Create reminders and schedule AI tasks at specific times
+            - save_memory: Persist information about the user across conversations
+            - forget_memory / forget_all_memories: Remove stored memories when asked
+            - open_app: Launch any installed app on the device
+            - get_installed_apps: Discover which apps are installed
+            - read_contacts: Search the user's contact list for names and phone numbers
+            - get_clipboard: Read the current clipboard contents
+
+            Always use tools when the user's intent matches a tool capability. After using a tool,
+            confirm the action in your final text response. For scheduled_at in schedule_task,
+            default to 1 hour from now if no time is specified.
+            {{MEMORIES_SECTION}}
+            Current date and time: {{DATETIME}}
+        """.trimIndent()
     }
 
     /**
-     * Sends [chatHistory] (which includes the current user message as the last entry)
-     * to the OpenAI API using the provided [apiKey]. Injects [memories] into the system prompt.
+     * Legacy single-turn method. Sends [chatHistory] to the Responses API.
+     * Used by [AiRepositoryImpl.sendMessage] (e.g. TaskReminderWorker old path).
      */
     suspend fun sendMessage(
         apiKey: String,
@@ -103,45 +131,155 @@ class OpenAiDataSource @Inject constructor(
                 put("input", inputMessages)
             }
 
-            val request = Request.Builder()
-                .url(OPENAI_URL)
-                .header("Authorization", "Bearer $apiKey")
-                .header("Content-Type", "application/json")
-                .post(requestBody.toString().toRequestBody(MEDIA_TYPE_JSON))
-                .build()
-
-            val response = okHttpClient.newCall(request).execute()
-            val responseBody = response.body?.string()
-                ?: return@withContext Result.failure(Exception("Empty response from OpenAI"))
-
-            if (!response.isSuccessful) {
-                val errorMsg = runCatching {
-                    JSONObject(responseBody).getJSONObject("error").getString("message")
-                }.getOrDefault("OpenAI error: HTTP ${response.code}")
-                return@withContext Result.failure(Exception(errorMsg))
+            executeRequest(apiKey, requestBody) { responseBody ->
+                parseTextFromOutput(responseBody)
             }
-
-            val output = JSONObject(responseBody).getJSONArray("output")
-            for (i in 0 until output.length()) {
-                val item = output.getJSONObject(i)
-                if (item.getString("type") == "message") {
-                    val content = item.getJSONArray("content")
-                    for (j in 0 until content.length()) {
-                        val contentItem = content.getJSONObject(j)
-                        if (contentItem.getString("type") == "output_text") {
-                            return@withContext Result.success(contentItem.getString("text").trim())
-                        }
-                    }
-                }
-            }
-            return@withContext Result.failure(Exception("No text response in output"))
         } catch (e: Exception) {
             Result.failure(e)
         }
     }
 
+    /**
+     * Agent-loop method. Sends accumulated [conversationItems] (Responses API format) and
+     * includes function tool definitions. Returns either a text response or function calls.
+     */
+    suspend fun sendMessageWithTools(
+        apiKey: String,
+        conversationItems: JSONArray,
+        memories: List<Memory>,
+        tools: List<AgentTool>
+    ): Result<AgentResponse> = withContext(Dispatchers.IO) {
+        try {
+            val toolsArray = JSONArray()
+            toolsArray.put(JSONObject().put("type", "web_search_preview"))
+            tools.forEach { tool ->
+                toolsArray.put(JSONObject().apply {
+                    put("type", "function")
+                    put("name", tool.name)
+                    put("description", tool.description)
+                    put("parameters", tool.parametersSchema())
+                })
+            }
+
+            val requestBody = JSONObject().apply {
+                put("model", MODEL)
+                put("instructions", buildToolsSystemPrompt(memories))
+                put("tools", toolsArray)
+                put("input", conversationItems)
+            }
+
+            executeRequest(apiKey, requestBody) { responseBody ->
+                parseAgentResponse(responseBody)
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    // ── Response parsing ──────────────────────────────────────────────────────
+
+    private fun parseTextFromOutput(responseBody: String): Result<String> {
+        val output = JSONObject(responseBody).getJSONArray("output")
+        for (i in 0 until output.length()) {
+            val item = output.getJSONObject(i)
+            if (item.getString("type") == "message") {
+                val content = item.getJSONArray("content")
+                for (j in 0 until content.length()) {
+                    val contentItem = content.getJSONObject(j)
+                    if (contentItem.getString("type") == "output_text") {
+                        return Result.success(contentItem.getString("text").trim())
+                    }
+                }
+            }
+        }
+        return Result.failure(Exception("No text response in output"))
+    }
+
+    private fun parseAgentResponse(responseBody: String): Result<AgentResponse> {
+        val output = JSONObject(responseBody).getJSONArray("output")
+        val functionCalls = mutableListOf<FunctionCall>()
+
+        for (i in 0 until output.length()) {
+            val item = output.getJSONObject(i)
+            when (item.optString("type")) {
+                "function_call" -> {
+                    functionCalls.add(
+                        FunctionCall(
+                            id = item.getString("call_id"),
+                            name = item.getString("name"),
+                            arguments = item.getString("arguments")
+                        )
+                    )
+                }
+                "message" -> {
+                    if (functionCalls.isEmpty()) {
+                        val content = item.getJSONArray("content")
+                        for (j in 0 until content.length()) {
+                            val contentItem = content.getJSONObject(j)
+                            if (contentItem.optString("type") == "output_text") {
+                                return Result.success(
+                                    AgentResponse.Text(contentItem.getString("text").trim())
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return if (functionCalls.isNotEmpty()) {
+            Result.success(AgentResponse.ToolCalls(functionCalls))
+        } else {
+            Result.failure(Exception("No text or function calls in response"))
+        }
+    }
+
+    // ── HTTP execution ────────────────────────────────────────────────────────
+
+    private fun <T> executeRequest(
+        apiKey: String,
+        requestBody: JSONObject,
+        parseResponse: (String) -> Result<T>
+    ): Result<T> {
+        val request = Request.Builder()
+            .url(OPENAI_URL)
+            .header("Authorization", "Bearer $apiKey")
+            .header("Content-Type", "application/json")
+            .post(requestBody.toString().toRequestBody(MEDIA_TYPE_JSON))
+            .build()
+
+        val response = okHttpClient.newCall(request).execute()
+        val responseBodyStr = response.body?.string()
+            ?: return Result.failure(Exception("Empty response from OpenAI"))
+
+        if (!response.isSuccessful) {
+            val errorMsg = runCatching {
+                JSONObject(responseBodyStr).getJSONObject("error").getString("message")
+            }.getOrDefault("OpenAI error: HTTP ${response.code}")
+            return Result.failure(Exception(errorMsg))
+        }
+
+        return parseResponse(responseBodyStr)
+    }
+
+    // ── System prompts ────────────────────────────────────────────────────────
+
     private fun buildSystemPrompt(memories: List<Memory>): String {
-        val memoriesSection = if (memories.isEmpty()) {
+        val now = formatEpochToIso(System.currentTimeMillis())
+        return SYSTEM_PROMPT_TEMPLATE
+            .replace("{{MEMORIES_SECTION}}", buildMemoriesSection(memories))
+            .replace("{{DATETIME}}", now)
+    }
+
+    private fun buildToolsSystemPrompt(memories: List<Memory>): String {
+        val now = formatEpochToIso(System.currentTimeMillis())
+        return TOOLS_SYSTEM_PROMPT_TEMPLATE
+            .replace("{{MEMORIES_SECTION}}", buildMemoriesSection(memories))
+            .replace("{{DATETIME}}", now)
+    }
+
+    private fun buildMemoriesSection(memories: List<Memory>): String =
+        if (memories.isEmpty()) {
             ""
         } else buildString {
             append("\n\n--- User Memories ---\n")
@@ -152,11 +290,6 @@ class OpenAiDataSource @Inject constructor(
             }
             append("--- End Memories ---")
         }
-        val now = formatEpochToIso(System.currentTimeMillis())
-        return SYSTEM_PROMPT_TEMPLATE
-            .replace("{{MEMORIES_SECTION}}", memoriesSection)
-            .replace("{{DATETIME}}", now)
-    }
 
     private fun formatEpochToIso(epochMillis: Long): String =
         java.time.Instant.ofEpochMilli(epochMillis)

@@ -156,6 +156,17 @@ fun ChatScreen(
                     }
                 }
 
+                uiState.agentStatusMessage?.let { status ->
+                    Text(
+                        text = status,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 4.dp)
+                    )
+                }
+
                 MessageInputBar(
                     text = uiState.inputText,
                     onTextChanged = viewModel::onInputChanged,

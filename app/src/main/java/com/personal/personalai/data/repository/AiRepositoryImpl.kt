@@ -5,12 +5,16 @@ import androidx.datastore.preferences.core.Preferences
 import com.personal.personalai.data.datasource.ai.MockAiDataSource
 import com.personal.personalai.data.datasource.ai.OpenAiDataSource
 import com.personal.personalai.data.datasource.ai.WhisperDataSource
+import com.personal.personalai.domain.model.Memory
 import com.personal.personalai.domain.model.Message
 import com.personal.personalai.domain.model.MessageRole
 import com.personal.personalai.domain.repository.AiRepository
 import com.personal.personalai.domain.repository.MemoryRepository
+import com.personal.personalai.domain.tools.AgentResponse
+import com.personal.personalai.domain.tools.AgentTool
 import com.personal.personalai.presentation.settings.PreferencesKeys
 import kotlinx.coroutines.flow.first
+import org.json.JSONArray
 import java.io.File
 import javax.inject.Inject
 
@@ -47,6 +51,19 @@ class AiRepositoryImpl @Inject constructor(
                 chatHistory + Message(content = message, role = MessageRole.USER)
             }
             openAiDataSource.sendMessage(apiKey, inputHistory, memories)
+        }
+    }
+
+    override suspend fun sendMessageWithTools(
+        conversationItems: JSONArray,
+        memories: List<Memory>,
+        tools: List<AgentTool>
+    ): Result<AgentResponse> {
+        val apiKey = dataStore.data.first()[PreferencesKeys.API_KEY].orEmpty()
+        return if (apiKey.isBlank()) {
+            Result.success(AgentResponse.Text("I need an OpenAI API key to use tools. Please add one in Settings."))
+        } else {
+            openAiDataSource.sendMessageWithTools(apiKey, conversationItems, memories, tools)
         }
     }
 

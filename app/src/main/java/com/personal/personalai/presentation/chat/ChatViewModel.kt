@@ -6,8 +6,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.personal.personalai.R
 import com.personal.personalai.domain.audio.AudioRecorder
+import com.personal.personalai.domain.usecase.AgentLoopUseCase
+import com.personal.personalai.domain.usecase.AgentStep
 import com.personal.personalai.domain.usecase.GetChatHistoryUseCase
-import com.personal.personalai.domain.usecase.SendMessageUseCase
 import com.personal.personalai.domain.usecase.TranscribeAudioUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -20,7 +21,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class ChatViewModel @Inject constructor(
-    private val sendMessageUseCase: SendMessageUseCase,
+    private val agentLoopUseCase: AgentLoopUseCase,
     private val getChatHistoryUseCase: GetChatHistoryUseCase,
     private val transcribeAudioUseCase: TranscribeAudioUseCase,
     private val audioRecorder: AudioRecorder,
@@ -53,19 +54,25 @@ class ChatViewModel @Inject constructor(
         _uiState.update { it.copy(inputText = "", isLoading = true, error = null) }
 
         viewModelScope.launch {
-            sendMessageUseCase(text)
-                .onSuccess {
-                    _uiState.update { it.copy(isLoading = false) }
+            agentLoopUseCase(text, backgroundMode = false).collect { step ->
+                when (step) {
+                    is AgentStep.ToolCalling ->
+                        _uiState.update { it.copy(agentStatusMessage = step.humanReadable) }
+                    is AgentStep.Complete -> {
+                        _uiState.update {
+                            it.copy(isLoading = false, agentStatusMessage = null)
+                        }
+                        step.result.onFailure { e ->
+                            _uiState.update { it.copy(error = e.message) }
+                        }
+                    }
                 }
-                .onFailure { error ->
-                    _uiState.update { it.copy(isLoading = false, error = error.message) }
-                }
+            }
         }
     }
 
     // ── Voice recording ──────────────────────────────────────────────────────
 
-    /** Called when the user presses and holds the mic button. */
     fun onRecordStart() {
         if (_uiState.value.voiceState != VoiceState.IDLE) return
         try {
@@ -77,7 +84,6 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    /** Called when the user releases the mic button — transcribes the recording. */
     fun onRecordStop() {
         if (_uiState.value.voiceState != VoiceState.RECORDING) return
         val file = audioRecorder.stop() ?: run {
@@ -98,14 +104,12 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    /** Called when the user drags their finger off the mic button — discards the recording. */
     fun onRecordCancel() {
         if (_uiState.value.voiceState != VoiceState.RECORDING) return
         audioRecorder.stop()?.delete()
         _uiState.update { it.copy(voiceState = VoiceState.IDLE) }
     }
 
-    /** Called when the runtime microphone permission is denied by the user. */
     fun onMicPermissionDenied() {
         _uiState.update { it.copy(error = context.getString(R.string.error_mic_permission)) }
     }

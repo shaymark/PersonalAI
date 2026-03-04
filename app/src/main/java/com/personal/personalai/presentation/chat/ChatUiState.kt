@@ -11,5 +11,6 @@ data class ChatUiState(
     val inputText: String = "",
     val isLoading: Boolean = false,
     val error: String? = null,
-    val voiceState: VoiceState = VoiceState.IDLE
+    val voiceState: VoiceState = VoiceState.IDLE,
+    val agentStatusMessage: String? = null
 )
