@@ -31,10 +31,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.personal.personalai.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -47,10 +49,10 @@ fun SettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Settings") },
+                title = { Text(stringResource(R.string.settings_title)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back_description))
                     }
                 }
             )
@@ -68,16 +70,16 @@ fun SettingsScreen(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text("AI Backend", style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.ai_backend_title), style = MaterialTheme.typography.titleMedium)
                     Text(
-                        "Enter your OpenAI API key (sk-...) to replace the built-in mock AI with real GPT-4o mini responses.",
+                        stringResource(R.string.ai_backend_description),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     OutlinedTextField(
                         value = uiState.apiKey,
                         onValueChange = viewModel::onApiKeyChanged,
-                        label = { Text("OpenAI API Key (sk-...)") },
+                        label = { Text(stringResource(R.string.api_key_label)) },
                         visualTransformation = PasswordVisualTransformation(),
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
@@ -89,7 +91,7 @@ fun SettingsScreen(
                     ) {
                         if (uiState.savedSuccessfully) {
                             Text(
-                                "Saved ✓",
+                                stringResource(R.string.api_key_saved),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.primary
                             )
@@ -105,7 +107,7 @@ fun SettingsScreen(
                                     strokeWidth = 2.dp
                                 )
                             } else {
-                                Text("Save")
+                                Text(stringResource(R.string.save))
                             }
                         }
                     }
@@ -117,7 +119,7 @@ fun SettingsScreen(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text("Data", style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.data_section_title), style = MaterialTheme.typography.titleMedium)
                     OutlinedButton(
                         onClick = viewModel::showClearHistoryDialog,
                         colors = ButtonDefaults.outlinedButtonColors(
@@ -126,7 +128,7 @@ fun SettingsScreen(
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.error),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("Clear Chat History")
+                        Text(stringResource(R.string.clear_chat_history))
                     }
                 }
             }
@@ -136,18 +138,18 @@ fun SettingsScreen(
     if (uiState.showClearHistoryDialog) {
         AlertDialog(
             onDismissRequest = viewModel::dismissClearHistoryDialog,
-            title = { Text("Clear Chat History") },
-            text = { Text("This will permanently delete all messages. This cannot be undone.") },
+            title = { Text(stringResource(R.string.clear_chat_history)) },
+            text = { Text(stringResource(R.string.clear_chat_confirm_message)) },
             confirmButton = {
                 TextButton(
                     onClick = viewModel::clearChatHistory,
                     colors = ButtonDefaults.textButtonColors(
                         contentColor = MaterialTheme.colorScheme.error
                     )
-                ) { Text("Clear") }
+                ) { Text(stringResource(R.string.clear)) }
             },
             dismissButton = {
-                TextButton(onClick = viewModel::dismissClearHistoryDialog) { Text("Cancel") }
+                TextButton(onClick = viewModel::dismissClearHistoryDialog) { Text(stringResource(R.string.cancel)) }
             }
         )
     }

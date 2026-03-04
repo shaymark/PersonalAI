@@ -1,4 +1,75 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">PersonalAI</string>
+
+    <!-- Chat screen -->
+    <string name="chat_title">PersonalAI</string>
+    <string name="settings_icon_description">Settings</string>
+    <string name="welcome_headline">Hi! I\'m your personal AI.</string>
+    <string name="welcome_body">Ask me anything, or say \"remind me to…\" and I\'ll schedule a task for you automatically.</string>
+    <string name="task_scheduled">Task scheduled: %1$s</string>
+    <string name="message_placeholder">Message…</string>
+    <string name="mic_hold_description">Hold to record</string>
+    <string name="mic_recording_description">Recording…</string>
+    <string name="send_description">Send</string>
+
+    <!-- Settings screen -->
+    <string name="settings_title">Settings</string>
+    <string name="back_description">Back</string>
+    <string name="ai_backend_title">AI Backend</string>
+    <string name="ai_backend_description">Enter your OpenAI API key (sk-…) to replace the built-in mock AI with real GPT-4o mini responses.</string>
+    <string name="api_key_label">OpenAI API Key (sk-…)</string>
+    <string name="api_key_saved">Saved ✓</string>
+    <string name="save">Save</string>
+    <string name="data_section_title">Data</string>
+    <string name="clear_chat_history">Clear Chat History</string>
+    <string name="clear_chat_confirm_message">This will permanently delete all messages. This cannot be undone.</string>
+    <string name="clear">Clear</string>
+    <string name="cancel">Cancel</string>
+
+    <!-- Scheduled tasks screen -->
+    <string name="scheduled_tasks_title">Scheduled Tasks</string>
+    <string name="add_task_description">Add task</string>
+    <string name="no_scheduled_tasks">No scheduled tasks</string>
+    <string name="no_tasks_body">Ask the AI to remind you about something, or tap + to add manually.</string>
+    <string name="repeats_daily">🔁 Repeats daily</string>
+    <string name="repeats_weekly">🔁 Repeats weekly</string>
+
+    <!-- Task dialogs (shared by Add and Edit) -->
+    <string name="add_task_dialog_title">Add Scheduled Task</string>
+    <string name="edit_task_dialog_title">Edit Task</string>
+    <string name="task_title_label">Title *</string>
+    <string name="task_type_label">Task Type</string>
+    <string name="reminder">Reminder</string>
+    <string name="ai_task">AI Task</string>
+    <string name="task_description_label">Description (optional)</string>
+    <string name="prompt_label">Prompt *</string>
+    <string name="prompt_placeholder">e.g. What are today\'s top news headlines?</string>
+    <string name="deliver_to_label">Deliver to</string>
+    <string name="notification">Notification</string>
+    <string name="chat">Chat</string>
+    <string name="both">Both</string>
+    <string name="repeat_label">Repeat</string>
+    <string name="none">None</string>
+    <string name="daily">Daily</string>
+    <string name="weekly">Weekly</string>
+    <string name="scheduled_time">Scheduled: %1$s</string>
+    <string name="must_be_future">⚠️ Must be in the future</string>
+    <string name="pick_date_time">📅 Pick date &amp; time</string>
+    <string name="add_30_min">+30 min</string>
+    <string name="add_1_hour">+1 hour</string>
+    <string name="add_1_day">+1 day</string>
+    <string name="schedule">Schedule</string>
+    <string name="delete_task_title">Delete task?</string>
+    <string name="delete_task_message">\"%1$s\" will be permanently removed. This action cannot be undone.</string>
+    <string name="delete">Delete</string>
+    <string name="delete_task">Delete task</string>
+
+    <!-- Navigation -->
+    <string name="nav_chat">Chat</string>
+    <string name="nav_schedule">Schedule</string>
+
+    <!-- Errors (resolved via Context.getString in ViewModel) -->
+    <string name="error_mic_permission">Microphone permission is required for voice input.</string>
+    <string name="error_recording_failed">Failed to start recording: %1$s</string>
 </resources>

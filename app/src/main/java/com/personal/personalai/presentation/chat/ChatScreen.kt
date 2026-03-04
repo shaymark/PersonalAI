@@ -60,6 +60,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.res.stringResource
+import com.personal.personalai.R
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -117,14 +119,14 @@ fun ChatScreen(
         Scaffold(
             topBar = {
                 TopAppBar(
-                    title = { Text("PersonalAI") },
+                    title = { Text(stringResource(R.string.chat_title)) },
                     colors = TopAppBarDefaults.topAppBarColors(
                         containerColor = MaterialTheme.colorScheme.primaryContainer,
                         titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
                     ),
                     actions = {
                         IconButton(onClick = onNavigateToSettings) {
-                            Icon(Icons.Default.Settings, contentDescription = "Settings")
+                            Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.settings_icon_description))
                         }
                     }
                 )
@@ -199,11 +201,11 @@ private fun WelcomePlaceholder(modifier: Modifier = Modifier) {
             Text("👋", style = MaterialTheme.typography.displayMedium)
             Spacer(Modifier.height(4.dp))
             Text(
-                "Hi! I'm your personal AI.",
+                stringResource(R.string.welcome_headline),
                 style = MaterialTheme.typography.headlineSmall
             )
             Text(
-                "Ask me anything, or say \"remind me to…\" and I'll schedule a task for you automatically.",
+                stringResource(R.string.welcome_body),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
@@ -257,7 +259,7 @@ private fun MessageBubble(message: Message) {
                         tint = MaterialTheme.colorScheme.secondary
                     )
                     Text(
-                        text = "Task scheduled: ${message.createdTaskTitle}",
+                        text = stringResource(R.string.task_scheduled, message.createdTaskTitle ?: ""),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSecondaryContainer
                     )
@@ -366,7 +368,7 @@ private fun MessageInputBar(
                 value = text,
                 onValueChange = onTextChanged,
                 modifier = Modifier.weight(1f),
-                placeholder = { Text("Message…") },
+                placeholder = { Text(stringResource(R.string.message_placeholder)) },
                 shape = RoundedCornerShape(24.dp),
                 maxLines = 4,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
@@ -403,7 +405,7 @@ private fun MessageInputBar(
                 when (voiceState) {
                     VoiceState.IDLE -> Icon(
                         imageVector = Icons.Default.Mic,
-                        contentDescription = "Hold to record",
+                        contentDescription = stringResource(R.string.mic_hold_description),
                         modifier = Modifier.size(26.dp),
                         tint = if (micEnabled) MaterialTheme.colorScheme.primary
                                else MaterialTheme.colorScheme.outline
@@ -421,7 +423,7 @@ private fun MessageInputBar(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Mic,
-                                contentDescription = "Recording…",
+                                contentDescription = stringResource(R.string.mic_recording_description),
                                 modifier = Modifier.size(34.dp),  // noticeably larger than IDLE
                                 tint = MaterialTheme.colorScheme.error
                             )
@@ -440,7 +442,7 @@ private fun MessageInputBar(
             ) {
                 Icon(
                     Icons.AutoMirrored.Filled.Send,
-                    contentDescription = "Send",
+                    contentDescription = stringResource(R.string.send_description),
                     tint = if (text.isNotBlank() && !isLoading)
                         MaterialTheme.colorScheme.primary
                     else MaterialTheme.colorScheme.outline

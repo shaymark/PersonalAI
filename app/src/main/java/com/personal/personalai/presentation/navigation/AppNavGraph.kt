@@ -10,6 +10,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.res.stringResource
+import com.personal.personalai.R
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
@@ -35,16 +37,16 @@ fun AppNavGraph() {
                     NavigationBarItem(
                         icon = {
                             when (screen) {
-                                Screen.Chat -> Icon(Icons.Default.Home, contentDescription = "Chat")
-                                Screen.ScheduledTasks -> Icon(Icons.Default.DateRange, contentDescription = "Schedule")
+                                Screen.Chat -> Icon(Icons.Default.Home, contentDescription = stringResource(R.string.nav_chat))
+                                Screen.ScheduledTasks -> Icon(Icons.Default.DateRange, contentDescription = stringResource(R.string.nav_schedule))
                                 else -> Unit
                             }
                         },
                         label = {
                             Text(
                                 when (screen) {
-                                    Screen.Chat -> "Chat"
-                                    Screen.ScheduledTasks -> "Schedule"
+                                    Screen.Chat -> stringResource(R.string.nav_chat)
+                                    Screen.ScheduledTasks -> stringResource(R.string.nav_schedule)
                                     else -> ""
                                 }
                             )

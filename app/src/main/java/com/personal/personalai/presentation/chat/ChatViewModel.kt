@@ -1,13 +1,16 @@
 package com.personal.personalai.presentation.chat
 
+import android.content.Context
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.personal.personalai.R
 import com.personal.personalai.domain.audio.AudioRecorder
 import com.personal.personalai.domain.usecase.GetChatHistoryUseCase
 import com.personal.personalai.domain.usecase.SendMessageUseCase
 import com.personal.personalai.domain.usecase.TranscribeAudioUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -20,7 +23,8 @@ class ChatViewModel @Inject constructor(
     private val sendMessageUseCase: SendMessageUseCase,
     private val getChatHistoryUseCase: GetChatHistoryUseCase,
     private val transcribeAudioUseCase: TranscribeAudioUseCase,
-    private val audioRecorder: AudioRecorder
+    private val audioRecorder: AudioRecorder,
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -69,7 +73,7 @@ class ChatViewModel @Inject constructor(
             _uiState.update { it.copy(voiceState = VoiceState.RECORDING) }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start recording: ${e.message}", e)
-            _uiState.update { it.copy(error = "Failed to start recording: ${e.message}") }
+            _uiState.update { it.copy(error = context.getString(R.string.error_recording_failed, e.message ?: "")) }
         }
     }
 
@@ -103,7 +107,7 @@ class ChatViewModel @Inject constructor(
 
     /** Called when the runtime microphone permission is denied by the user. */
     fun onMicPermissionDenied() {
-        _uiState.update { it.copy(error = "Microphone permission is required for voice input.") }
+        _uiState.update { it.copy(error = context.getString(R.string.error_mic_permission)) }
     }
 
     fun dismissError() {

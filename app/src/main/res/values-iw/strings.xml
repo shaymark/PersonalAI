@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">עוזר אישי</string>
+
+    <!-- Chat screen -->
+    <string name="chat_title">עוזר אישי</string>
+    <string name="settings_icon_description">הגדרות</string>
+    <string name="welcome_headline">היי! אני הבינה המלאכותית האישית שלך.</string>
+    <string name="welcome_body">שאל/י אותי כל דבר, או אמור/י \"תזכיר לי…\" ואני אתזמן משימה עבורך אוטומטית.</string>
+    <string name="task_scheduled">משימה תוזמנה: %1$s</string>
+    <string name="message_placeholder">הודעה…</string>
+    <string name="mic_hold_description">לחץ/י להקלטה</string>
+    <string name="mic_recording_description">מקליט…</string>
+    <string name="send_description">שלח</string>
+
+    <!-- Settings screen -->
+    <string name="settings_title">הגדרות</string>
+    <string name="back_description">חזרה</string>
+    <string name="ai_backend_title">מנוע בינה מלאכותית</string>
+    <string name="ai_backend_description">הזן/י את מפתח ה-API של OpenAI (sk-…) כדי להחליף את ה-AI המובנה בתגובות GPT-4o mini אמיתיות.</string>
+    <string name="api_key_label">מפתח API של OpenAI (sk-…)</string>
+    <string name="api_key_saved">נשמר ✓</string>
+    <string name="save">שמור</string>
+    <string name="data_section_title">נתונים</string>
+    <string name="clear_chat_history">נקה היסטוריית שיחה</string>
+    <string name="clear_chat_confirm_message">פעולה זו תמחק לצמיתות את כל ההודעות. לא ניתן לבטל פעולה זו.</string>
+    <string name="clear">נקה</string>
+    <string name="cancel">ביטול</string>
+
+    <!-- Scheduled tasks screen -->
+    <string name="scheduled_tasks_title">משימות מתוזמנות</string>
+    <string name="add_task_description">הוסף משימה</string>
+    <string name="no_scheduled_tasks">אין משימות מתוזמנות</string>
+    <string name="no_tasks_body">בקש/י מה-AI להזכיר לך משהו, או לחץ/י + להוסיף ידנית.</string>
+    <string name="repeats_daily">🔁 חוזר יומיומית</string>
+    <string name="repeats_weekly">🔁 חוזר שבועית</string>
+
+    <!-- Task dialogs -->
+    <string name="add_task_dialog_title">הוסף משימה מתוזמנת</string>
+    <string name="edit_task_dialog_title">ערוך משימה</string>
+    <string name="task_title_label">כותרת *</string>
+    <string name="task_type_label">סוג משימה</string>
+    <string name="reminder">תזכורת</string>
+    <string name="ai_task">משימת AI</string>
+    <string name="task_description_label">תיאור (אופציונלי)</string>
+    <string name="prompt_label">פקודה *</string>
+    <string name="prompt_placeholder">לדוגמה: מהן כותרות החדשות המובילות היום?</string>
+    <string name="deliver_to_label">שלח אל</string>
+    <string name="notification">התראה</string>
+    <string name="chat">צ\'אט</string>
+    <string name="both">שניהם</string>
+    <string name="repeat_label">חזרה</string>
+    <string name="none">ללא</string>
+    <string name="daily">יומי</string>
+    <string name="weekly">שבועי</string>
+    <string name="scheduled_time">מתוזמן: %1$s</string>
+    <string name="must_be_future">⚠️ חייב להיות בעתיד</string>
+    <string name="pick_date_time">📅 בחר תאריך ושעה</string>
+    <string name="add_30_min">+30 דקות</string>
+    <string name="add_1_hour">+שעה</string>
+    <string name="add_1_day">+יום</string>
+    <string name="schedule">תזמן</string>
+    <string name="delete_task_title">מחק משימה?</string>
+    <string name="delete_task_message">\"%1$s\" תוסר לצמיתות. פעולה זו אינה ניתנת לביטול.</string>
+    <string name="delete">מחק</string>
+    <string name="delete_task">מחק משימה</string>
+
+    <!-- Navigation -->
+    <string name="nav_chat">צ\'אט</string>
+    <string name="nav_schedule">לוח זמנים</string>
+
+    <!-- Errors -->
+    <string name="error_mic_permission">נדרשת הרשאה למיקרופון לקלט קולי.</string>
+    <string name="error_recording_failed">ההקלטה נכשלה: %1$s</string>
+</resources>
