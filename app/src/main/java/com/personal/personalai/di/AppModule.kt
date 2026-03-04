@@ -20,6 +20,7 @@ import com.personal.personalai.data.repository.MemoryRepositoryImpl
 import com.personal.personalai.data.repository.TaskRepositoryImpl
 import com.personal.personalai.data.tools.ToolRegistryImpl
 import com.personal.personalai.data.tools.android.GetClipboardTool
+import com.personal.personalai.data.tools.interaction.AskUserTool
 import com.personal.personalai.data.tools.android.GetInstalledAppsTool
 import com.personal.personalai.data.tools.android.OpenAppTool
 import com.personal.personalai.data.tools.android.ReadContactsTool
@@ -152,4 +153,9 @@ abstract class ToolModule {
 
     @Binds @IntoSet
     abstract fun bindGetClipboardTool(impl: GetClipboardTool): AgentTool
+
+    // ── Interaction tools ─────────────────────────────────────────────────────
+
+    @Binds @IntoSet
+    abstract fun bindAskUserTool(impl: AskUserTool): AgentTool
 }

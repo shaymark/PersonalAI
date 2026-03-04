@@ -167,6 +167,30 @@ fun ChatScreen(
                     )
                 }
 
+                // Question card shown when the agent is waiting for the user's answer
+                uiState.pendingInputRequest?.let { request ->
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.secondaryContainer,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 4.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text("❓", style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                text = request.question,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
+                    }
+                }
+
                 MessageInputBar(
                     text = uiState.inputText,
                     onTextChanged = viewModel::onInputChanged,
@@ -183,7 +207,8 @@ fun ChatScreen(
                     },
                     onRecordRelease = viewModel::onRecordStop,
                     onRecordCancel = viewModel::onRecordCancel,
-                    isLoading = uiState.isLoading,
+                    // Allow input while agent waits for an answer
+                    isLoading = uiState.isLoading && uiState.pendingInputRequest == null,
                     modifier = Modifier.fillMaxWidth()
                 )
             }

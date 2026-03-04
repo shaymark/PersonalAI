@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.personal.personalai.R
 import com.personal.personalai.domain.audio.AudioRecorder
+import com.personal.personalai.domain.tools.UserInputBroker
 import com.personal.personalai.domain.usecase.AgentLoopUseCase
 import com.personal.personalai.domain.usecase.AgentStep
 import com.personal.personalai.domain.usecase.GetChatHistoryUseCase
@@ -25,6 +26,7 @@ class ChatViewModel @Inject constructor(
     private val getChatHistoryUseCase: GetChatHistoryUseCase,
     private val transcribeAudioUseCase: TranscribeAudioUseCase,
     private val audioRecorder: AudioRecorder,
+    private val userInputBroker: UserInputBroker,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -33,6 +35,7 @@ class ChatViewModel @Inject constructor(
 
     init {
         observeMessages()
+        observeUserInputRequests()
     }
 
     private fun observeMessages() {
@@ -43,13 +46,37 @@ class ChatViewModel @Inject constructor(
         }
     }
 
+    /** Listens for [AskUserTool] questions and surfaces them in the UI. */
+    private fun observeUserInputRequests() {
+        viewModelScope.launch {
+            userInputBroker.incoming.collect { request ->
+                _uiState.update {
+                    it.copy(
+                        pendingInputRequest = request,
+                        agentStatusMessage = "💬 Waiting for your response…"
+                    )
+                }
+            }
+        }
+    }
+
     fun onInputChanged(text: String) {
         _uiState.update { it.copy(inputText = text) }
     }
 
     fun sendMessage() {
         val text = _uiState.value.inputText.trim()
-        if (text.isEmpty() || _uiState.value.isLoading) return
+        if (text.isEmpty()) return
+
+        // If the agent is waiting for the user to answer a question, route the text as the answer.
+        val pending = _uiState.value.pendingInputRequest
+        if (pending != null) {
+            _uiState.update { it.copy(inputText = "", pendingInputRequest = null) }
+            userInputBroker.answer(pending.id, text)
+            return
+        }
+
+        if (_uiState.value.isLoading) return
 
         _uiState.update { it.copy(inputText = "", isLoading = true, error = null) }
 

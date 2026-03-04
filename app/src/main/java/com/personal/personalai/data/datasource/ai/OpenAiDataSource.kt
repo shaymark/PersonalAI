@@ -97,10 +97,16 @@ class OpenAiDataSource @Inject constructor(
             - get_installed_apps: Discover which apps are installed
             - read_contacts: Search the user's contact list for names and phone numbers
             - get_clipboard: Read the current clipboard contents
+            - ask_user: Ask the user a question and wait for their answer before continuing
 
             Always use tools when the user's intent matches a tool capability. After using a tool,
             confirm the action in your final text response. For scheduled_at in schedule_task,
             default to 1 hour from now if no time is specified.
+
+            IMPORTANT — Clarification: When the user's request is ambiguous or missing details
+            needed to complete a task (e.g. no time specified for a reminder, unclear which app
+            or contact, missing preference), use ask_user to ask a single focused question before
+            proceeding. Do NOT assume or guess when you can simply ask.
             {{MEMORIES_SECTION}}
             Current date and time: {{DATETIME}}
         """.trimIndent()

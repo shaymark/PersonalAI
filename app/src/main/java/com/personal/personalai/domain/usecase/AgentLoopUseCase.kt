@@ -141,6 +141,10 @@ class AgentLoopUseCase @Inject constructor(
             "get_installed_apps" -> "📱 Checking installed apps…"
             "read_contacts" -> "📋 Reading contacts…"
             "get_clipboard" -> "📋 Reading clipboard…"
+            "ask_user" -> {
+                val q = args.optString("question", "")
+                if (q.isNotBlank()) "❓ $q" else "❓ Asking you a question…"
+            }
             else -> "🔧 Running $toolName…"
         }
     }
