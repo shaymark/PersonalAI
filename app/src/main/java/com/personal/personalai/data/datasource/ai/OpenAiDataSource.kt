@@ -29,7 +29,7 @@ class OpenAiDataSource @Inject constructor(
 
     companion object {
         private const val OPENAI_URL = "https://api.openai.com/v1/responses"
-        private const val MODEL = "gpt-4o-mini"
+        private const val MODEL = "gpt-4o"
         private const val MAX_HISTORY_MESSAGES = 20
         private val MEDIA_TYPE_JSON = "application/json; charset=utf-8".toMediaType()
 
@@ -103,10 +103,11 @@ class OpenAiDataSource @Inject constructor(
             confirm the action in your final text response. For scheduled_at in schedule_task,
             default to 1 hour from now if no time is specified.
 
-            IMPORTANT — Clarification: When the user's request is ambiguous or missing details
-            needed to complete a task (e.g. no time specified for a reminder, unclear which app
-            or contact, missing preference), use ask_user to ask a single focused question before
-            proceeding. Do NOT assume or guess when you can simply ask.
+            CRITICAL — Asking questions: You must NEVER ask the user a question in your text
+            response. If you need any information to complete a task (a time, a name, a preference,
+            a confirmation), you MUST call the ask_user tool instead. Only use your text response
+            for final answers and confirmations after all necessary information has been gathered.
+            Asking a question in plain text is not allowed — always use ask_user.
             {{MEMORIES_SECTION}}
             Current date and time: {{DATETIME}}
         """.trimIndent()
