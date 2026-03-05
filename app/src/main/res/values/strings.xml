@@ -32,6 +32,10 @@
     <string name="ai_provider_openai">OpenAI (Cloud)</string>
     <string name="ai_provider_local">Local LLM</string>
     <string name="local_llm_note">Runs fully on-device — no internet or API key required.\nReminders and memory tags still work via text instructions.</string>
+    <string name="hf_token_section_title">HuggingFace Access Token</string>
+    <string name="hf_token_note">Required to download gated Gemma models. Accept the Gemma licence on HuggingFace, then generate a Read token at huggingface.co/settings/tokens.</string>
+    <string name="hf_token_label">HuggingFace Token (hf_…)</string>
+    <string name="hf_token_saved">Saved ✓</string>
     <string name="local_models_title">Available Models</string>
     <string name="download">Download</string>
     <string name="downloading">Downloading…</string>

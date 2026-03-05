@@ -83,6 +83,70 @@ object PromptTemplates {
      * @param chatHistory  Previous conversation turns (up to last 6 are included).
      * @param memories     User memories to inject into the system prompt.
      */
+    /**
+     * Assembles a full single-string prompt in **Gemma instruction format** for MediaPipe inference.
+     *
+     * Format (Gemma 2 / Gemma 3):
+     * ```
+     * <start_of_turn>user
+     * {system prompt}
+     *
+     * {oldest history message}
+     * <end_of_turn>
+     * <start_of_turn>model
+     * {response}
+     * <end_of_turn>
+     * ...
+     * <start_of_turn>user
+     * {current message}
+     * <end_of_turn>
+     * <start_of_turn>model
+     * ```
+     * The system prompt is injected into the first user turn.
+     * OpenAI never calls this function — it uses the Chat Completions API directly.
+     *
+     * @param userMessage  The latest user message.
+     * @param chatHistory  Previous conversation turns (up to last 6 are included).
+     * @param memories     User memories to inject into the system prompt.
+     */
+    fun buildGemmaPrompt(
+        userMessage: String,
+        chatHistory: List<Message>,
+        memories: List<Memory>
+    ): String = buildString {
+        val systemPrompt = buildLocalSystemPrompt(memories)
+        val history = chatHistory.takeLast(6)
+        var systemInjected = false
+
+        // Walk through history, prepending system prompt to the first user turn
+        history.forEach { msg ->
+            val role = if (msg.role == MessageRole.USER) "user" else "model"
+            if (role == "user" && !systemInjected) {
+                // Inject system prompt into the first user turn
+                append("<start_of_turn>user\n${systemPrompt}\n\n${msg.content}<end_of_turn>\n")
+                systemInjected = true
+            } else {
+                append("<start_of_turn>$role\n${msg.content}<end_of_turn>\n")
+            }
+        }
+
+        // Current user message
+        if (!systemInjected) {
+            // No history: system prompt + current message as a single first user turn
+            append("<start_of_turn>user\n${systemPrompt}\n\n${userMessage}<end_of_turn>\n")
+        } else {
+            append("<start_of_turn>user\n${userMessage}<end_of_turn>\n")
+        }
+
+        // Prompt the model to begin its response
+        append("<start_of_turn>model\n")
+    }
+
+    /**
+     * Assembles a full single-string prompt in ChatML format for GGUF inference.
+     * Kept for future use with llama.cpp / any ChatML-compatible model.
+     * OpenAI uses the Chat Completions API directly and never calls this.
+     */
     fun buildLocalPrompt(
         userMessage: String,
         chatHistory: List<Message>,

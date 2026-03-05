@@ -162,6 +162,55 @@ fun SettingsScreen(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+
+                        // ── HuggingFace token ─────────────────────────────────
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            stringResource(R.string.hf_token_section_title),
+                            style = MaterialTheme.typography.labelMedium
+                        )
+                        Text(
+                            stringResource(R.string.hf_token_note),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        OutlinedTextField(
+                            value             = uiState.hfToken,
+                            onValueChange     = viewModel::onHfTokenChanged,
+                            label             = { Text(stringResource(R.string.hf_token_label)) },
+                            visualTransformation = PasswordVisualTransformation(),
+                            modifier          = Modifier.fillMaxWidth(),
+                            singleLine        = true
+                        )
+                        Row(
+                            modifier              = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End,
+                            verticalAlignment     = Alignment.CenterVertically
+                        ) {
+                            if (uiState.hfTokenSavedSuccessfully) {
+                                Text(
+                                    stringResource(R.string.hf_token_saved),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(Modifier.width(8.dp))
+                            }
+                            Button(
+                                onClick = viewModel::saveHfToken,
+                                enabled = !uiState.isHfTokenSaving
+                            ) {
+                                if (uiState.isHfTokenSaving) {
+                                    CircularProgressIndicator(
+                                        modifier    = Modifier.size(16.dp),
+                                        strokeWidth = 2.dp
+                                    )
+                                } else {
+                                    Text(stringResource(R.string.save))
+                                }
+                            }
+                        }
+
+                        // ── Available models ──────────────────────────────────
                         Spacer(Modifier.height(4.dp))
                         Text(
                             stringResource(R.string.local_models_title),

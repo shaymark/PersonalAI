@@ -17,6 +17,10 @@ data class SettingsUiState(
     val aiProvider: AiProvider = AiProvider.OPENAI,
 
     // ── Local LLM backend ─────────────────────────────────────────────────────
+    /** HuggingFace access token — sent as `Authorization: Bearer` when downloading gated models. */
+    val hfToken: String = "",
+    val isHfTokenSaving: Boolean = false,
+    val hfTokenSavedSuccessfully: Boolean = false,
     /** All model presets available for download (sourced from [Models.all]). */
     val availableModels: List<ModelDescriptor> = Models.all,
     /** IDs of models whose GGUF files are already present on disk. */

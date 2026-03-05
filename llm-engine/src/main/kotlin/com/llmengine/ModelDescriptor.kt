@@ -1,66 +1,70 @@
 package com.llmengine
 
 /**
- * Describes a GGUF model that can be downloaded from HuggingFace and loaded on-device.
+ * Describes a MediaPipe-format model that can be downloaded and loaded on-device.
  *
- * @param id              Unique identifier used for file naming and comparison.
- * @param displayName     Human-readable name shown in UIs.
+ * @param id              Unique identifier used for persistence and comparison.
+ * @param displayName     Human-readable name shown in the Settings UI.
  * @param huggingFaceRepo HuggingFace repository in the form "owner/repo-name".
- * @param fileName        Exact file name of the GGUF file inside the repo.
- * @param sizeBytes       Approximate size used for progress display when Content-Length is absent.
+ * @param fileName        Exact filename of the model file inside the repo.
+ * @param sizeBytes       Approximate size used for progress display.
+ * @param requiresHfAuth  True if the HuggingFace repo is gated (needs license acceptance).
  */
 data class ModelDescriptor(
     val id: String,
     val displayName: String,
     val huggingFaceRepo: String,
     val fileName: String,
-    val sizeBytes: Long
+    val sizeBytes: Long,
+    val requiresHfAuth: Boolean = false
 )
 
-/** Pre-defined model descriptors. Consumers can also create their own [ModelDescriptor]s. */
+/**
+ * Pre-defined MediaPipe model descriptors.
+ *
+ * ⚠️  IMPORTANT — These models are gated on HuggingFace.
+ * To download them you must:
+ *   1. Create a free HuggingFace account at https://huggingface.co
+ *   2. Accept the Gemma licence on the model page (one-time, takes ~10 seconds)
+ *   3. Generate a Read access token at https://huggingface.co/settings/tokens
+ *
+ * Download URL format:
+ *   https://huggingface.co/{huggingFaceRepo}/resolve/main/{fileName}
+ *   with header  Authorization: Bearer <your_token>
+ */
 object Models {
 
-    /** Qwen 2.5 1.5B Instruct — Q4_K_M — ~986 MB. Good for low-RAM devices. */
-    val QWEN2_5_1_5B_Q4 = ModelDescriptor(
-        id = "qwen2.5-1.5b-q4_k_m",
-        displayName = "Qwen 2.5 1.5B (Q4_K_M, ~1 GB)",
-        huggingFaceRepo = "Qwen/Qwen2.5-1.5B-Instruct-GGUF",
-        fileName = "qwen2.5-1.5b-instruct-q4_k_m.gguf",
-        sizeBytes = 986_000_000L
+    /**
+     * Gemma 3 1B Instruct — int4 — ~555 MB.
+     * Best choice: small, fast, GPU-accelerated via MediaPipe.
+     * Repo: https://huggingface.co/litert-community/Gemma3-1B-IT
+     */
+    val GEMMA3_1B_INT4 = ModelDescriptor(
+        id              = "gemma3-1b-it-int4",
+        displayName     = "Gemma 3 1B int4 (~555 MB) ⚡",
+        huggingFaceRepo = "litert-community/Gemma3-1B-IT",
+        fileName        = "gemma3-1b-it-int4.task",
+        sizeBytes       = 555_000_000L,
+        requiresHfAuth  = true
     )
 
-    /** Qwen 2.5 3B Instruct — Q4_K_M — ~2 GB. Better quality, needs ≥4 GB RAM. */
-    val QWEN2_5_3B_Q4 = ModelDescriptor(
-        id = "qwen2.5-3b-q4_k_m",
-        displayName = "Qwen 2.5 3B (Q4_K_M, ~2 GB)",
-        huggingFaceRepo = "Qwen/Qwen2.5-3B-Instruct-GGUF",
-        fileName = "qwen2.5-3b-instruct-q4_k_m.gguf",
-        sizeBytes = 2_000_000_000L
-    )
-
-    /** Llama 3.2 1B Instruct — Q4_K_M — ~770 MB. Smallest footprint option. */
-    val LLAMA3_2_1B_Q4 = ModelDescriptor(
-        id = "llama3.2-1b-q4_k_m",
-        displayName = "Llama 3.2 1B (Q4_K_M, ~770 MB)",
-        huggingFaceRepo = "bartowski/Llama-3.2-1B-Instruct-GGUF",
-        fileName = "Llama-3.2-1B-Instruct-Q4_K_M.gguf",
-        sizeBytes = 770_000_000L
-    )
-
-    /** Phi 3.5 Mini Instruct — Q4_K_M — ~2.2 GB. Strong reasoning in a compact model. */
-    val PHI3_5_MINI_Q4 = ModelDescriptor(
-        id = "phi3.5-mini-q4_k_m",
-        displayName = "Phi 3.5 Mini (Q4_K_M, ~2.2 GB)",
-        huggingFaceRepo = "bartowski/Phi-3.5-mini-instruct-GGUF",
-        fileName = "Phi-3.5-mini-instruct-Q4_K_M.gguf",
-        sizeBytes = 2_200_000_000L
+    /**
+     * Gemma 3 4B Instruct — int4 — ~2.6 GB.
+     * Higher quality responses; needs ≥ 4 GB free RAM.
+     * Repo: https://huggingface.co/litert-community/Gemma3-4B-IT
+     */
+    val GEMMA3_4B_INT4 = ModelDescriptor(
+        id              = "gemma3-4b-it-int4",
+        displayName     = "Gemma 3 4B int4 (~2.6 GB)",
+        huggingFaceRepo = "litert-community/Gemma3-4B-IT",
+        fileName        = "gemma3-4b-it-int4-web.task",
+        sizeBytes       = 2_600_000_000L,
+        requiresHfAuth  = true
     )
 
     /** All built-in model presets as a list, for use in UI enumerations. */
     val all: List<ModelDescriptor> get() = listOf(
-        QWEN2_5_1_5B_Q4,
-        QWEN2_5_3B_Q4,
-        LLAMA3_2_1B_Q4,
-        PHI3_5_MINI_Q4
+        GEMMA3_1B_INT4,
+        GEMMA3_4B_INT4
     )
 }

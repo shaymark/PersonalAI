@@ -9,36 +9,8 @@ android {
 
     defaultConfig {
         minSdk = 26
-
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles("consumer-rules.pro")
-
-        externalNativeBuild {
-            cmake {
-                arguments(
-                    "-DANDROID_STL=c++_shared",
-                    "-DLLAMA_BUILD_TESTS=OFF",
-                    "-DLLAMA_BUILD_EXAMPLES=OFF",
-                    "-DLLAMA_BUILD_SERVER=OFF",
-                    "-DGGML_NATIVE=OFF",
-                    "-DGGML_OPENMP=OFF"
-                )
-                cppFlags("-std=c++17")
-            }
-        }
-
-        ndk {
-            abiFilters += listOf("arm64-v8a")  // x86_64 removed — only needed for emulator, halves Vulkan shader build time
-        }
-    }
-
-    ndkVersion = "27.2.12479018"
-
-    externalNativeBuild {
-        cmake {
-            path = file("CMakeLists.txt")
-            version = "3.22.1"
-        }
     }
 
     buildTypes {
@@ -62,7 +34,14 @@ android {
 }
 
 dependencies {
+    // MediaPipe on-device LLM inference — GPU-accelerated, no NDK compilation required
+    implementation("com.google.mediapipe:tasks-genai:0.10.27")
+
+    // Model download
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
+    // Coroutines for Flow / suspend support
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.1")
+
     implementation("androidx.core:core-ktx:1.13.1")
 }

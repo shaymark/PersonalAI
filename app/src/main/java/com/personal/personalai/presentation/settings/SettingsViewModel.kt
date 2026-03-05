@@ -25,6 +25,7 @@ object PreferencesKeys {
     val API_KEY        = stringPreferencesKey("api_key")
     val AI_PROVIDER    = stringPreferencesKey("ai_provider")
     val LOCAL_MODEL_ID = stringPreferencesKey("local_model_id")
+    val HF_TOKEN       = stringPreferencesKey("hf_token")
 }
 
 @HiltViewModel
@@ -57,6 +58,7 @@ class SettingsViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         apiKey            = preferences[PreferencesKeys.API_KEY] ?: "",
+                        hfToken           = preferences[PreferencesKeys.HF_TOKEN] ?: "",
                         aiProvider        = provider,
                         selectedModelId   = selectedId,
                         downloadedModelIds = downloadedIds
@@ -79,6 +81,23 @@ class SettingsViewModel @Inject constructor(
                 _uiState.update { it.copy(isSaving = false, savedSuccessfully = true) }
             }.onFailure {
                 _uiState.update { it.copy(isSaving = false) }
+            }
+        }
+    }
+
+    // ── HuggingFace token ─────────────────────────────────────────────────────
+
+    fun onHfTokenChanged(token: String) =
+        _uiState.update { it.copy(hfToken = token, hfTokenSavedSuccessfully = false) }
+
+    fun saveHfToken() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isHfTokenSaving = true) }
+            runCatching {
+                dataStore.edit { prefs -> prefs[PreferencesKeys.HF_TOKEN] = _uiState.value.hfToken }
+                _uiState.update { it.copy(isHfTokenSaving = false, hfTokenSavedSuccessfully = true) }
+            }.onFailure {
+                _uiState.update { it.copy(isHfTokenSaving = false) }
             }
         }
     }
@@ -113,7 +132,7 @@ class SettingsViewModel @Inject constructor(
     fun downloadModel(model: ModelDescriptor) {
         viewModelScope.launch {
             _uiState.update { it.copy(downloadingModelId = model.id, downloadError = null) }
-            modelManager.download(model).collect { state ->
+            modelManager.download(model, hfToken = _uiState.value.hfToken).collect { state ->
                 when (state) {
                     is DownloadState.Progress -> {
                         _uiState.update {

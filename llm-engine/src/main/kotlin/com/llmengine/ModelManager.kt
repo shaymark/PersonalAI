@@ -52,8 +52,12 @@ class ModelManager(context: Context) {
      * so a partially downloaded file is never returned by [getModelFile].
      *
      * If the file is already downloaded, this function immediately emits [DownloadState.Done].
+     *
+     * @param hfToken Optional HuggingFace access token. Required for gated models
+     *                (i.e. those where [ModelDescriptor.requiresHfAuth] is `true`).
+     *                Sent as `Authorization: Bearer <token>` when non-blank.
      */
-    fun download(model: ModelDescriptor): Flow<DownloadState> = flow {
+    fun download(model: ModelDescriptor, hfToken: String = ""): Flow<DownloadState> = flow {
         val destFile = File(modelsDir, model.fileName)
 
         // Already present — skip download
@@ -69,6 +73,7 @@ class ModelManager(context: Context) {
             val request = Request.Builder()
                 .url(url)
                 .header("User-Agent", "llm-engine/1.0")
+                .apply { if (hfToken.isNotBlank()) header("Authorization", "Bearer $hfToken") }
                 .build()
 
             val response = client.newCall(request).execute()
@@ -132,10 +137,8 @@ class ModelManager(context: Context) {
      */
     fun listDownloaded(): List<ModelDescriptor> =
         listOf(
-            Models.QWEN2_5_1_5B_Q4,
-            Models.QWEN2_5_3B_Q4,
-            Models.LLAMA3_2_1B_Q4,
-            Models.PHI3_5_MINI_Q4
+            Models.GEMMA3_1B_INT4,
+            Models.GEMMA3_4B_INT4,
         ).filter { getModelFile(it) != null }
 
     /**

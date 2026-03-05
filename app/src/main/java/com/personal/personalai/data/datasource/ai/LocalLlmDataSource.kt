@@ -30,21 +30,20 @@ private val GENERATION_PARAMS = GenerationParams(
     maxTokens   = 1024,
     temperature = 0.7f,
     topP        = 0.9f,
-    // Stop strings for ChatML format (Qwen 2.5 / Phi 3.5 / Llama 3.2).
-    // Special tokens are filtered in JNI (special=false in llama_token_to_piece),
-    // but we keep these as a text-level safety net for edge cases.
-    stopStrings = listOf("<|im_end|>", "<|endoftext|>", "<|im_start|>")
+    // MediaPipe/Gemma handles end-of-generation via its own EOS tokens internally.
+    // The stopStrings field is kept for API compatibility but is not used by MediaPipeSession.
+    stopStrings = emptyList()
 )
 
 /**
- * On-device LLM inference backend using the [LlmEngine] / llama.cpp library.
+ * On-device LLM inference backend using the [LlmEngine] / MediaPipe library.
  *
  * A single [LlmSession] is kept alive and reused across calls. The session is
  * reloaded automatically when the user selects a different model. No internet
  * access is required once a model file has been downloaded.
  *
- * Prompt format: ChatML — compatible with Qwen 2.5, Llama 3.2, and Phi 3.5 GGUF files.
- * Tool results are text-only (function/tool calling is not supported in this mode).
+ * Prompt format: Gemma instruction format — compatible with Gemma 2 and Gemma 3 MediaPipe models.
+ * Tool results are text-only (function/tool calling is not supported in local mode).
  * The [com.personal.personalai.domain.usecase.SendMessageUseCase] tag parser
  * ([TASK:{...}], [MEMORY:{...}], etc.) is still active, so scheduling and memory
  * features work when the local model follows the tag instructions in the system prompt.
@@ -102,13 +101,12 @@ class LocalLlmDataSource @Inject constructor(
         Log.d(TAG, "Model file found: ${file.absolutePath} (${file.length() / 1_048_576} MB)")
 
         return withContext(Dispatchers.IO) {
-            // gpuLayers=999 offloads ALL transformer layers to the Vulkan GPU (10–30× faster).
-            // contextSize=2048 reduces KV-cache size vs 4096, cutting per-token memory bandwidth.
-            // threads capped at 8 to avoid thermal throttle on high-core-count SoCs.
-            val threads = Runtime.getRuntime().availableProcessors().coerceIn(4, 8)
+            // useGpu=true requests GPU acceleration via MediaPipe (OpenGL ES / Vulkan).
+            // MediaPipe falls back to CPU automatically if the device GPU is unsupported.
             LlmEngine.load(
+                context   = context,
                 modelFile = file,
-                params = EngineParams(contextSize = 2048, threads = threads, gpuLayers = 999)
+                params    = EngineParams(maxTokens = 1024, temperature = 0.7f, useGpu = true)
             ).also {
                 currentSession  = it
                 currentModelId  = modelId
@@ -158,7 +156,7 @@ class LocalLlmDataSource @Inject constructor(
                 "No local model is loaded. Please download and select a model in " +
                 "Settings → AI Backend → Local LLM."
             )
-        val prompt = PromptTemplates.buildLocalPrompt(message, chatHistory, memories)
+        val prompt = PromptTemplates.buildGemmaPrompt(message, chatHistory, memories)
         generateOrThrow(session, prompt)
     }
 
@@ -191,8 +189,7 @@ class LocalLlmDataSource @Inject constructor(
             Log.d(TAG, "Extracted user text (${lastUserText.length} chars): ${lastUserText.take(80)}")
         }
 
-        val prompt = PromptTemplates.buildLocalPrompt(lastUserText, emptyList(), memories)
-//        val prompt = "you are helpful assistant every response need to be max 10 words, please answer this question: what is the capital of france?"
+        val prompt = PromptTemplates.buildGemmaPrompt(lastUserText, emptyList(), memories)
         AgentResponse.Text(generateOrThrow(session, prompt))
     }
 
