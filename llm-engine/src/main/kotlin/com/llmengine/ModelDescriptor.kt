@@ -55,4 +55,12 @@ object Models {
         fileName = "Phi-3.5-mini-instruct-Q4_K_M.gguf",
         sizeBytes = 2_200_000_000L
     )
+
+    /** All built-in model presets as a list, for use in UI enumerations. */
+    val all: List<ModelDescriptor> get() = listOf(
+        QWEN2_5_1_5B_Q4,
+        QWEN2_5_3B_Q4,
+        LLAMA3_2_1B_Q4,
+        PHI3_5_MINI_Q4
+    )
 }

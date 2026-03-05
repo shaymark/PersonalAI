@@ -2,6 +2,7 @@ package com.personal.personalai.data.repository
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import com.personal.personalai.data.datasource.ai.LocalLlmDataSource
 import com.personal.personalai.data.datasource.ai.MockAiDataSource
 import com.personal.personalai.data.datasource.ai.OpenAiDataSource
 import com.personal.personalai.data.datasource.ai.WhisperDataSource
@@ -20,8 +21,10 @@ import javax.inject.Inject
 
 /**
  * Central [AiRepository] implementation that decides at runtime which backend to use:
- * - If an OpenAI API key is stored in DataStore → delegates to [OpenAiDataSource]
- * - Otherwise → delegates to [MockAiDataSource]
+ *
+ * - Provider == "local_llm"         → [LocalLlmDataSource] (on-device GGUF inference)
+ * - Provider == "openai" + API key  → [OpenAiDataSource]  (GPT-4o via Responses API)
+ * - Provider == "openai" + no key   → [MockAiDataSource]  (deterministic offline fallback)
  *
  * Loads the user's memories before each call and passes them to the data source so they
  * can be injected into the system prompt.
@@ -31,14 +34,23 @@ import javax.inject.Inject
 class AiRepositoryImpl @Inject constructor(
     private val openAiDataSource: OpenAiDataSource,
     private val mockAiDataSource: MockAiDataSource,
+    private val localLlmDataSource: LocalLlmDataSource,
     private val whisperDataSource: WhisperDataSource,
     private val dataStore: DataStore<Preferences>,
     private val memoryRepository: MemoryRepository
 ) : AiRepository {
 
+    private suspend fun isLocalLlm(): Boolean =
+        dataStore.data.first()[PreferencesKeys.AI_PROVIDER] == "local_llm"
+
     override suspend fun sendMessage(message: String, chatHistory: List<Message>): Result<String> {
-        val apiKey = dataStore.data.first()[PreferencesKeys.API_KEY].orEmpty()
         val memories = memoryRepository.getMemories().first()
+
+        if (isLocalLlm()) {
+            return localLlmDataSource.sendMessage(message, chatHistory, memories)
+        }
+
+        val apiKey = dataStore.data.first()[PreferencesKeys.API_KEY].orEmpty()
         return if (apiKey.isBlank()) {
             mockAiDataSource.sendMessage(message, chatHistory, memories)
         } else {
@@ -59,15 +71,25 @@ class AiRepositoryImpl @Inject constructor(
         memories: List<Memory>,
         tools: List<AgentTool>
     ): Result<AgentResponse> {
+        if (isLocalLlm()) {
+            return localLlmDataSource.sendMessageWithTools(conversationItems, memories, tools)
+        }
+
         val apiKey = dataStore.data.first()[PreferencesKeys.API_KEY].orEmpty()
         return if (apiKey.isBlank()) {
-            Result.success(AgentResponse.Text("I need an OpenAI API key to use tools. Please add one in Settings."))
+            Result.success(
+                AgentResponse.Text(
+                    "I need an OpenAI API key or a local model to respond. " +
+                    "Please configure one in Settings → AI Backend."
+                )
+            )
         } else {
             openAiDataSource.sendMessageWithTools(apiKey, conversationItems, memories, tools)
         }
     }
 
     override suspend fun transcribeAudio(audioFile: File): Result<String> {
+        // Audio transcription always requires the Whisper API — not available with local models
         val apiKey = dataStore.data.first()[PreferencesKeys.API_KEY].orEmpty()
         return if (apiKey.isBlank()) {
             Result.failure(Exception("Whisper requires an OpenAI API key. Add one in Settings."))

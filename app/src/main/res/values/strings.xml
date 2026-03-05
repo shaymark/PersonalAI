@@ -17,7 +17,7 @@
     <string name="settings_title">Settings</string>
     <string name="back_description">Back</string>
     <string name="ai_backend_title">AI Backend</string>
-    <string name="ai_backend_description">Enter your OpenAI API key (sk-…) to replace the built-in mock AI with real GPT-4o mini responses.</string>
+    <string name="ai_backend_description">Enter your OpenAI API key (sk-…) to replace the built-in mock AI with real GPT-4o responses.</string>
     <string name="api_key_label">OpenAI API Key (sk-…)</string>
     <string name="api_key_saved">Saved ✓</string>
     <string name="save">Save</string>
@@ -26,6 +26,19 @@
     <string name="clear_chat_confirm_message">This will permanently delete all messages. This cannot be undone.</string>
     <string name="clear">Clear</string>
     <string name="cancel">Cancel</string>
+    <string name="ok">OK</string>
+
+    <!-- Local LLM settings -->
+    <string name="ai_provider_openai">OpenAI (Cloud)</string>
+    <string name="ai_provider_local">Local LLM</string>
+    <string name="local_llm_note">Runs fully on-device — no internet or API key required.\nReminders and memory tags still work via text instructions.</string>
+    <string name="local_models_title">Available Models</string>
+    <string name="download">Download</string>
+    <string name="downloading">Downloading…</string>
+    <string name="downloading_model">Downloading %1$s</string>
+    <string name="select_model">Select</string>
+    <string name="model_selected">Selected</string>
+    <string name="download_failed_title">Download Failed</string>
 
     <!-- Scheduled tasks screen -->
     <string name="scheduled_tasks_title">Scheduled Tasks</string>
