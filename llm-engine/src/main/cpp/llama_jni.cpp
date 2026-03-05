@@ -87,7 +87,8 @@ Java_com_llmengine_LlamaJni_nativeLoadModel(
     llama_context_params cparams = llama_context_default_params();
     cparams.n_ctx           = static_cast<uint32_t>(ctx_size);
     cparams.n_threads       = static_cast<uint32_t>(n_threads);
-    cparams.n_threads_batch = static_cast<uint32_t>(n_threads);
+    cparams.n_threads_batch = static_cast<uint32_t>(n_threads) * 2;  // more parallelism during prompt decode
+    cparams.flash_attn      = true;   // fused attention kernel — faster + less memory bandwidth
 
     llama_context* ctx = llama_init_from_model(model, cparams);
     if (!ctx) {

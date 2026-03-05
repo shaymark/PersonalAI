@@ -28,7 +28,7 @@ android {
         }
 
         ndk {
-            abiFilters += listOf("arm64-v8a", "x86_64")
+            abiFilters += listOf("arm64-v8a")  // x86_64 removed — only needed for emulator, halves Vulkan shader build time
         }
     }
 

@@ -1,5 +1,6 @@
 package com.llmengine
 
+import android.util.Log
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.buffer
@@ -38,7 +39,9 @@ interface LlmSession {
         params: GenerationParams = GenerationParams()
     ): String {
         val sb = StringBuilder()
-        generate(prompt, params).collect { sb.append(it) }
+        generate(prompt, params).collect {
+            sb.append(it)
+        }
         return sb.toString()
     }
 
@@ -66,7 +69,7 @@ internal class LlamaSession(private val handle: Long) : LlmSession {
             val buffer = StringBuilder()
             var stopped = false
 
-            LlamaJni.nativeGenerate(
+            val nGenerated = LlamaJni.nativeGenerate(
                 handle = handle,
                 prompt = prompt,
                 maxTokens = params.maxTokens,
@@ -82,11 +85,21 @@ internal class LlamaSession(private val handle: Long) : LlmSession {
                             stopped = true
                             return
                         }
+                        Log.d("LlmSession", "onToken: $piece")
                         trySend(piece)
                     }
                 }
             )
-            close()
+            // Propagate JNI errors as exceptions so callers receive a Result.failure
+            // instead of silently getting an empty response string.
+            if (nGenerated < 0) {
+                close(IllegalStateException(
+                    "Local LLM generation failed (native code $nGenerated). " +
+                    "Possible causes: out of RAM, corrupt GGUF file, or context overflow."
+                ))
+            } else {
+                close()
+            }
         }.buffer(Channel.UNLIMITED).flowOn(Dispatchers.IO)
 
     override fun unload() {

@@ -16,6 +16,8 @@ import org.json.JSONObject
 import javax.inject.Inject
 
 sealed class AgentStep {
+    /** Emitted immediately before each AI call so the UI can show a loading indicator. */
+    data object Thinking : AgentStep()
     /** Emitted each time the LLM decides to call a tool. */
     data class ToolCalling(val toolName: String, val humanReadable: String) : AgentStep()
     /** Emitted when the agent produces a final text response or encounters an error. */
@@ -75,6 +77,10 @@ class AgentLoopUseCase @Inject constructor(
 
         // 4. Agent loop
         repeat(MAX_ITERATIONS) { iteration ->
+            // Notify UI so it can show a loading/typing indicator before the (potentially slow)
+            // AI call. This is especially important for local LLM which can take 10–30 seconds.
+            emit(AgentStep.Thinking)
+
             val response = aiRepository.sendMessageWithTools(conversationItems, memories, tools)
                 .getOrElse { e ->
                     emit(AgentStep.Complete(Result.failure(e)))

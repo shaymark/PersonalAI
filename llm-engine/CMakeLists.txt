@@ -5,7 +5,7 @@ project(llmengine)
 set(LLAMA_BUILD_TESTS    OFF CACHE BOOL "" FORCE)
 set(LLAMA_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(LLAMA_BUILD_SERVER   OFF CACHE BOOL "" FORCE)
-set(GGML_NATIVE          OFF CACHE BOOL "" FORCE)
+set(GGML_NATIVE          OFF CACHE BOOL "" FORCE)   # -march=native breaks cross-compile; off is correct
 set(GGML_OPENMP          OFF CACHE BOOL "" FORCE)
 set(LLAMA_NATIVE         OFF CACHE BOOL "" FORCE)
 
@@ -23,7 +23,8 @@ add_library(llmengine SHARED
     src/main/cpp/llama_jni.cpp
 )
 
-target_compile_options(llmengine PRIVATE -O2)
+# -O3 gives meaningful throughput gains over -O2 for GGML matrix kernels
+target_compile_options(llmengine PRIVATE -O3)
 
 target_include_directories(llmengine PRIVATE
     ${llama_SOURCE_DIR}/include

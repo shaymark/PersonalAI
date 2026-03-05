@@ -109,8 +109,9 @@ class TaskReminderWorker @AssistedInject constructor(
 
         agentLoopUseCase(aiPrompt, backgroundMode = true).collect { step ->
             when (step) {
+                is AgentStep.Thinking    -> Log.d(TAG, "Agent thinking…")
                 is AgentStep.ToolCalling -> Log.d(TAG, "Agent tool call: ${step.toolName}")
-                is AgentStep.Complete -> finalText = step.result.getOrNull()
+                is AgentStep.Complete    -> finalText = step.result.getOrNull()
             }
         }
 
