@@ -7,12 +7,28 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <uses-permission android:name="android.permission.SEND_SMS" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
-    <!-- Required for Android 11+ package visibility: allows querying launcher apps -->
+    <!-- Required for Android 11+ package visibility -->
     <queries>
+        <!-- Launcher apps (get_installed_apps, open_app) -->
         <intent>
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+        <!-- Phone dialer (dial_phone) -->
+        <intent>
+            <action android:name="android.intent.action.DIAL" />
+        </intent>
+        <!-- Calendar (add_calendar_event) -->
+        <intent>
+            <action android:name="android.intent.action.INSERT" />
+            <data android:mimeType="vnd.android.cursor.dir/event" />
+        </intent>
+        <!-- Alarm clock (set_alarm) -->
+        <intent>
+            <action android:name="android.intent.action.SET_ALARM" />
         </intent>
     </queries>
 

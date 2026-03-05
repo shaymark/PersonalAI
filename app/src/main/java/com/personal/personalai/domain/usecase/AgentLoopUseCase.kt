@@ -145,6 +145,30 @@ class AgentLoopUseCase @Inject constructor(
                 val q = args.optString("question", "")
                 if (q.isNotBlank()) "❓ $q" else "❓ Asking you a question…"
             }
+            "send_sms" -> {
+                val to = args.optString("phone_number", "")
+                if (to.isNotBlank()) "💬 Sending SMS to $to…" else "💬 Sending SMS…"
+            }
+            "dial_phone" -> {
+                val num = args.optString("phone_number", "")
+                if (num.isNotBlank()) "📞 Dialing $num…" else "📞 Opening dialer…"
+            }
+            "set_alarm" -> {
+                val h = args.optInt("hour", -1)
+                val m = args.optInt("minute", -1)
+                if (h >= 0 && m >= 0) "⏰ Setting alarm for %02d:%02d…".format(h, m)
+                else "⏰ Setting alarm…"
+            }
+            "get_battery_level" -> "🔋 Checking battery…"
+            "send_notification" -> {
+                val t = args.optString("title", "")
+                if (t.isNotBlank()) "🔔 Sending notification: $t…" else "🔔 Sending notification…"
+            }
+            "get_location" -> "📍 Getting your location…"
+            "add_calendar_event" -> {
+                val t = args.optString("title", "")
+                if (t.isNotBlank()) "📅 Adding to calendar: $t…" else "📅 Adding calendar event…"
+            }
             else -> "🔧 Running $toolName…"
         }
     }

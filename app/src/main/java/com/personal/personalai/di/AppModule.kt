@@ -19,11 +19,18 @@ import com.personal.personalai.data.repository.ChatRepositoryImpl
 import com.personal.personalai.data.repository.MemoryRepositoryImpl
 import com.personal.personalai.data.repository.TaskRepositoryImpl
 import com.personal.personalai.data.tools.ToolRegistryImpl
+import com.personal.personalai.data.tools.android.AddCalendarEventTool
+import com.personal.personalai.data.tools.android.DialPhoneTool
+import com.personal.personalai.data.tools.android.GetBatteryLevelTool
 import com.personal.personalai.data.tools.android.GetClipboardTool
-import com.personal.personalai.data.tools.interaction.AskUserTool
 import com.personal.personalai.data.tools.android.GetInstalledAppsTool
+import com.personal.personalai.data.tools.android.GetLocationTool
 import com.personal.personalai.data.tools.android.OpenAppTool
 import com.personal.personalai.data.tools.android.ReadContactsTool
+import com.personal.personalai.data.tools.android.SendNotificationTool
+import com.personal.personalai.data.tools.android.SendSmsTool
+import com.personal.personalai.data.tools.android.SetAlarmTool
+import com.personal.personalai.data.tools.interaction.AskUserTool
 import com.personal.personalai.data.tools.management.ForgetAllMemoriesTool
 import com.personal.personalai.data.tools.management.ForgetMemoryTool
 import com.personal.personalai.data.tools.management.SaveMemoryTool
@@ -158,4 +165,29 @@ abstract class ToolModule {
 
     @Binds @IntoSet
     abstract fun bindAskUserTool(impl: AskUserTool): AgentTool
+
+    // ── Communication tools ───────────────────────────────────────────────────
+
+    @Binds @IntoSet
+    abstract fun bindSendSmsTool(impl: SendSmsTool): AgentTool
+
+    @Binds @IntoSet
+    abstract fun bindDialPhoneTool(impl: DialPhoneTool): AgentTool
+
+    // ── Device tools ──────────────────────────────────────────────────────────
+
+    @Binds @IntoSet
+    abstract fun bindSetAlarmTool(impl: SetAlarmTool): AgentTool
+
+    @Binds @IntoSet
+    abstract fun bindGetBatteryLevelTool(impl: GetBatteryLevelTool): AgentTool
+
+    @Binds @IntoSet
+    abstract fun bindSendNotificationTool(impl: SendNotificationTool): AgentTool
+
+    @Binds @IntoSet
+    abstract fun bindGetLocationTool(impl: GetLocationTool): AgentTool
+
+    @Binds @IntoSet
+    abstract fun bindAddCalendarEventTool(impl: AddCalendarEventTool): AgentTool
 }
