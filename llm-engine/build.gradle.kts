@@ -6,11 +6,31 @@ plugins {
 android {
     namespace = "com.llmengine"
     compileSdk = 36
+    ndkVersion = "27.2.12479018"
 
     defaultConfig {
         minSdk = 26
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles("consumer-rules.pro")
+
+        externalNativeBuild {
+            cmake {
+                cppFlags("-std=c++17")
+                arguments(
+                    "-DANDROID_STL=c++_shared",
+                    "-DLLAMA_BUILD_TESTS=OFF",
+                    "-DLLAMA_BUILD_EXAMPLES=OFF",
+                    "-DLLAMA_BUILD_SERVER=OFF"
+                )
+            }
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path = file("CMakeLists.txt")
+            version = "3.22.1"
+        }
     }
 
     buildTypes {
@@ -31,12 +51,16 @@ android {
     kotlinOptions {
         jvmTarget = "11"
     }
+
+    packaging {
+        jniLibs {
+            // Keep only the shared libs we actually need
+            pickFirsts += setOf("**/libc++_shared.so", "**/libllama-engine.so")
+        }
+    }
 }
 
 dependencies {
-    // MediaPipe on-device LLM inference — GPU-accelerated, no NDK compilation required
-    implementation("com.google.mediapipe:tasks-genai:0.10.27")
-
     // Model download
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
 

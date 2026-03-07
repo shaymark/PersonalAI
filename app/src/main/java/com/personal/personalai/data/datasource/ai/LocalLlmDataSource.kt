@@ -30,23 +30,20 @@ private val GENERATION_PARAMS = GenerationParams(
     maxTokens   = 1024,
     temperature = 0.7f,
     topP        = 0.9f,
-    // MediaPipe/Gemma handles end-of-generation via its own EOS tokens internally.
-    // The stopStrings field is kept for API compatibility but is not used by MediaPipeSession.
-    stopStrings = emptyList()
+    stopStrings = listOf("<|im_end|>", "<|endoftext|>")
 )
 
 /**
- * On-device LLM inference backend using the [LlmEngine] / MediaPipe library.
+ * On-device LLM inference backend using the [LlmEngine] / llama.cpp library.
  *
  * A single [LlmSession] is kept alive and reused across calls. The session is
  * reloaded automatically when the user selects a different model. No internet
  * access is required once a model file has been downloaded.
  *
- * Prompt format: Gemma instruction format — compatible with Gemma 2 and Gemma 3 MediaPipe models.
+ * Prompt format: ChatML — compatible with Qwen3.5 and other instruction-tuned GGUF models.
  * Tool results are text-only (function/tool calling is not supported in local mode).
- * The [com.personal.personalai.domain.usecase.SendMessageUseCase] tag parser
- * ([TASK:{...}], [MEMORY:{...}], etc.) is still active, so scheduling and memory
- * features work when the local model follows the tag instructions in the system prompt.
+ * The tag parser ([TASK:{...}], [MEMORY:{...}], etc.) is still active so scheduling
+ * and memory features work when the local model follows the system prompt instructions.
  */
 @Singleton
 class LocalLlmDataSource @Inject constructor(
@@ -101,10 +98,7 @@ class LocalLlmDataSource @Inject constructor(
         Log.d(TAG, "Model file found: ${file.absolutePath} (${file.length() / 1_048_576} MB)")
 
         return withContext(Dispatchers.IO) {
-            // useGpu=true requests GPU acceleration via MediaPipe (OpenGL ES / Vulkan).
-            // MediaPipe falls back to CPU automatically if the device GPU is unsupported.
             LlmEngine.load(
-                context   = context,
                 modelFile = file,
                 params    = EngineParams(maxTokens = 1024, temperature = 0.7f, useGpu = true)
             ).also {
@@ -132,7 +126,7 @@ class LocalLlmDataSource @Inject constructor(
             error(
                 "The model returned an empty response.\n" +
                 "This can happen if:\n" +
-                "• The model generated only an end-of-sequence token (try Qwen 2.5 1.5B)\n" +
+                "• The model generated only an end-of-sequence token\n" +
                 "• The device ran out of RAM during inference\n" +
                 "• The GGUF file is corrupted — try re-downloading the model"
             )
@@ -156,7 +150,7 @@ class LocalLlmDataSource @Inject constructor(
                 "No local model is loaded. Please download and select a model in " +
                 "Settings → AI Backend → Local LLM."
             )
-        val prompt = PromptTemplates.buildGemmaPrompt(message, chatHistory, memories)
+        val prompt = PromptTemplates.buildLocalPrompt(message, chatHistory, memories)
         generateOrThrow(session, prompt)
     }
 
@@ -189,7 +183,7 @@ class LocalLlmDataSource @Inject constructor(
             Log.d(TAG, "Extracted user text (${lastUserText.length} chars): ${lastUserText.take(80)}")
         }
 
-        val prompt = PromptTemplates.buildGemmaPrompt(lastUserText, emptyList(), memories)
+        val prompt = PromptTemplates.buildLocalPrompt(lastUserText, emptyList(), memories)
         AgentResponse.Text(generateOrThrow(session, prompt))
     }
 

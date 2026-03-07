@@ -37,15 +37,15 @@ class MainActivity : ComponentActivity() {
 
 suspend fun testllmEngine(context: Context) {
     val manager = ModelManager(context)
-    manager.download(Models.GEMMA3_1B_INT4).collect { state ->
+    manager.download(Models.QWEN_3_5_4B).collect { state ->
         when (state) {
             is DownloadState.Progress -> {  Log.d("MainActivity", state.toString())}
             is DownloadState.Done -> { Log.d("MainActivity", state.toString()) }
             is DownloadState.Failed -> { Log.d("MainActivity", state.toString()) }
         }
     }
-    val file = manager.getModelFile(Models.GEMMA3_1B_INT4) ?: error("Not downloaded")
-    val session = withContext(Dispatchers.IO) { LlmEngine.load(context,file) }
+    val file = manager.getModelFile(Models.QWEN_3_5_4B) ?: error("Not downloaded")
+    val session = withContext(Dispatchers.IO) { LlmEngine.load(file) }
     val prompt = "you are helpful assistant every response need to be max 10 words, please answer this question: what is the capital of france?"
     session.generate(prompt).collect {
         Log.d("MainActivity", it)

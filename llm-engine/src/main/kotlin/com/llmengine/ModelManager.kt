@@ -136,10 +136,7 @@ class ModelManager(context: Context) {
      * currently downloaded on this device.
      */
     fun listDownloaded(): List<ModelDescriptor> =
-        listOf(
-            Models.GEMMA3_1B_INT4,
-            Models.GEMMA3_4B_INT4,
-        ).filter { getModelFile(it) != null }
+        Models.all.filter { getModelFile(it) != null }
 
     /**
      * Delete [model]'s downloaded file.
