@@ -4,7 +4,7 @@ import com.llmengine.ModelDescriptor
 import com.llmengine.Models
 
 /** Which AI backend the user has selected. */
-enum class AiProvider { OPENAI, LOCAL_LLM }
+enum class AiProvider { OPENAI, LOCAL_LLM, OLLAMA }
 
 data class SettingsUiState(
     // ── OpenAI backend ────────────────────────────────────────────────────────
@@ -32,5 +32,19 @@ data class SettingsUiState(
     /** Non-null while a model is being downloaded; contains the model's ID. */
     val downloadingModelId: String? = null,
     /** Set when a download fails; shown in an error dialog. */
-    val downloadError: String? = null
+    val downloadError: String? = null,
+
+    // ── Ollama Dev Mode backend ───────────────────────────────────────────────
+    /** Base URL of the Ollama server, e.g. "http://10.100.102.75:11434". */
+    val ollamaUrl: String = "",
+    /** Ollama model tag to use for inference, e.g. "qwen3.5:4b". */
+    val ollamaModel: String = "",
+    val isOllamaSaving: Boolean = false,
+    val ollamaSavedSuccessfully: Boolean = false,
+
+    // ── Web Search (Serper.dev) ───────────────────────────────────────────────
+    /** Serper.dev API key — used by WebSearchTool for real Google results. */
+    val serperApiKey: String = "",
+    val isSerperSaving: Boolean = false,
+    val serperSavedSuccessfully: Boolean = false
 )

@@ -83,10 +83,6 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             agentLoopUseCase(text, backgroundMode = false).collect { step ->
                 when (step) {
-                    is AgentStep.Thinking ->
-                        // Show a loading indicator immediately. For local LLM this can
-                        // take 5–30 seconds; without this the UI looks frozen.
-                        _uiState.update { it.copy(agentStatusMessage = "🤔 Thinking…") }
                     is AgentStep.ToolCalling ->
                         _uiState.update { it.copy(agentStatusMessage = step.humanReadable) }
                     is AgentStep.Complete -> {

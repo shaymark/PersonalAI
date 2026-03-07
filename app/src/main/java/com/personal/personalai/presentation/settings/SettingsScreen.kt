@@ -101,14 +101,20 @@ fun SettingsScreen(
                         SegmentedButton(
                             selected = uiState.aiProvider == AiProvider.OPENAI,
                             onClick  = { viewModel.setAiProvider(AiProvider.OPENAI) },
-                            shape    = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+                            shape    = SegmentedButtonDefaults.itemShape(index = 0, count = 3)
                         ) { Text(stringResource(R.string.ai_provider_openai)) }
 
                         SegmentedButton(
                             selected = uiState.aiProvider == AiProvider.LOCAL_LLM,
                             onClick  = { viewModel.setAiProvider(AiProvider.LOCAL_LLM) },
-                            shape    = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
+                            shape    = SegmentedButtonDefaults.itemShape(index = 1, count = 3)
                         ) { Text(stringResource(R.string.ai_provider_local)) }
+
+                        SegmentedButton(
+                            selected = uiState.aiProvider == AiProvider.OLLAMA,
+                            onClick  = { viewModel.setAiProvider(AiProvider.OLLAMA) },
+                            shape    = SegmentedButtonDefaults.itemShape(index = 2, count = 3)
+                        ) { Text(stringResource(R.string.ai_provider_ollama)) }
                     }
 
                     // ── OpenAI tab content ────────────────────────────────────
@@ -229,6 +235,112 @@ fun SettingsScreen(
                                 onSelect      = { viewModel.selectModel(model) },
                                 onDelete      = { viewModel.deleteModel(model) }
                             )
+                        }
+                    }
+
+                    // ── Ollama Dev Mode tab content ───────────────────────────
+                    if (uiState.aiProvider == AiProvider.OLLAMA) {
+                        Text(
+                            stringResource(R.string.ollama_note),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        OutlinedTextField(
+                            value             = uiState.ollamaUrl,
+                            onValueChange     = viewModel::onOllamaUrlChanged,
+                            label             = { Text(stringResource(R.string.ollama_url_label)) },
+                            placeholder       = { Text("http://10.100.102.75:11434") },
+                            modifier          = Modifier.fillMaxWidth(),
+                            singleLine        = true
+                        )
+                        OutlinedTextField(
+                            value             = uiState.ollamaModel,
+                            onValueChange     = viewModel::onOllamaModelChanged,
+                            label             = { Text(stringResource(R.string.ollama_model_label)) },
+                            placeholder       = { Text("qwen3.5:4b") },
+                            modifier          = Modifier.fillMaxWidth(),
+                            singleLine        = true
+                        )
+                        Row(
+                            modifier              = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End,
+                            verticalAlignment     = Alignment.CenterVertically
+                        ) {
+                            if (uiState.ollamaSavedSuccessfully) {
+                                Text(
+                                    stringResource(R.string.ollama_saved),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(Modifier.width(8.dp))
+                            }
+                            Button(
+                                onClick = viewModel::saveOllamaSettings,
+                                enabled = !uiState.isOllamaSaving
+                            ) {
+                                if (uiState.isOllamaSaving) {
+                                    CircularProgressIndicator(
+                                        modifier    = Modifier.size(16.dp),
+                                        strokeWidth = 2.dp
+                                    )
+                                } else {
+                                    Text(stringResource(R.string.save))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ── Web Search card ───────────────────────────────────────────────
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier              = Modifier.padding(16.dp),
+                    verticalArrangement   = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        stringResource(R.string.web_search_title),
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Text(
+                        stringResource(R.string.web_search_note),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    OutlinedTextField(
+                        value             = uiState.serperApiKey,
+                        onValueChange     = viewModel::onSerperApiKeyChanged,
+                        label             = { Text(stringResource(R.string.serper_api_key_label)) },
+                        visualTransformation = PasswordVisualTransformation(),
+                        modifier          = Modifier.fillMaxWidth(),
+                        singleLine        = true
+                    )
+                    Row(
+                        modifier              = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End,
+                        verticalAlignment     = Alignment.CenterVertically
+                    ) {
+                        if (uiState.serperSavedSuccessfully) {
+                            Text(
+                                stringResource(R.string.serper_saved),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(Modifier.width(8.dp))
+                        }
+                        Button(
+                            onClick = viewModel::saveSerperApiKey,
+                            enabled = !uiState.isSerperSaving
+                        ) {
+                            if (uiState.isSerperSaving) {
+                                CircularProgressIndicator(
+                                    modifier    = Modifier.size(16.dp),
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Text(stringResource(R.string.save))
+                            }
                         }
                     }
                 }

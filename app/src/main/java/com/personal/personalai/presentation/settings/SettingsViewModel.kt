@@ -26,6 +26,9 @@ object PreferencesKeys {
     val AI_PROVIDER    = stringPreferencesKey("ai_provider")
     val LOCAL_MODEL_ID = stringPreferencesKey("local_model_id")
     val HF_TOKEN       = stringPreferencesKey("hf_token")
+    val OLLAMA_URL     = stringPreferencesKey("ollama_url")
+    val OLLAMA_MODEL   = stringPreferencesKey("ollama_model")
+    val SERPER_API_KEY = stringPreferencesKey("serper_api_key")
 }
 
 @HiltViewModel
@@ -51,17 +54,24 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             dataStore.data.collect { preferences ->
                 val providerStr  = preferences[PreferencesKeys.AI_PROVIDER] ?: "openai"
-                val provider     = if (providerStr == "local_llm") AiProvider.LOCAL_LLM else AiProvider.OPENAI
+                val provider     = when (providerStr) {
+                    "local_llm" -> AiProvider.LOCAL_LLM
+                    "ollama"    -> AiProvider.OLLAMA
+                    else        -> AiProvider.OPENAI
+                }
                 val selectedId   = preferences[PreferencesKeys.LOCAL_MODEL_ID] ?: ""
                 val downloadedIds = modelManager.listDownloaded().map { it.id }.toSet()
 
                 _uiState.update {
                     it.copy(
-                        apiKey            = preferences[PreferencesKeys.API_KEY] ?: "",
-                        hfToken           = preferences[PreferencesKeys.HF_TOKEN] ?: "",
-                        aiProvider        = provider,
-                        selectedModelId   = selectedId,
-                        downloadedModelIds = downloadedIds
+                        apiKey             = preferences[PreferencesKeys.API_KEY] ?: "",
+                        hfToken            = preferences[PreferencesKeys.HF_TOKEN] ?: "",
+                        aiProvider         = provider,
+                        selectedModelId    = selectedId,
+                        downloadedModelIds = downloadedIds,
+                        ollamaUrl          = preferences[PreferencesKeys.OLLAMA_URL]   ?: "",
+                        ollamaModel        = preferences[PreferencesKeys.OLLAMA_MODEL] ?: "",
+                        serperApiKey       = preferences[PreferencesKeys.SERPER_API_KEY] ?: ""
                     )
                 }
             }
@@ -107,11 +117,38 @@ class SettingsViewModel @Inject constructor(
     fun setAiProvider(provider: AiProvider) {
         viewModelScope.launch {
             dataStore.edit { prefs ->
-                prefs[PreferencesKeys.AI_PROVIDER] = if (provider == AiProvider.LOCAL_LLM) "local_llm" else "openai"
+                prefs[PreferencesKeys.AI_PROVIDER] = when (provider) {
+                    AiProvider.LOCAL_LLM -> "local_llm"
+                    AiProvider.OLLAMA    -> "ollama"
+                    AiProvider.OPENAI    -> "openai"
+                }
             }
             // Free RAM immediately when the user switches away from local mode
-            if (provider == AiProvider.OPENAI) localLlmDataSource.unloadSession()
+            if (provider != AiProvider.LOCAL_LLM) localLlmDataSource.unloadSession()
             _uiState.update { it.copy(aiProvider = provider) }
+        }
+    }
+
+    // ── Ollama Dev Mode settings ──────────────────────────────────────────────
+
+    fun onOllamaUrlChanged(url: String) =
+        _uiState.update { it.copy(ollamaUrl = url, ollamaSavedSuccessfully = false) }
+
+    fun onOllamaModelChanged(model: String) =
+        _uiState.update { it.copy(ollamaModel = model, ollamaSavedSuccessfully = false) }
+
+    fun saveOllamaSettings() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isOllamaSaving = true) }
+            runCatching {
+                dataStore.edit { prefs ->
+                    prefs[PreferencesKeys.OLLAMA_URL]   = _uiState.value.ollamaUrl.trim()
+                    prefs[PreferencesKeys.OLLAMA_MODEL] = _uiState.value.ollamaModel.trim()
+                }
+                _uiState.update { it.copy(isOllamaSaving = false, ollamaSavedSuccessfully = true) }
+            }.onFailure {
+                _uiState.update { it.copy(isOllamaSaving = false) }
+            }
         }
     }
 
@@ -183,6 +220,25 @@ class SettingsViewModel @Inject constructor(
             if (selectedId == model.id) {
                 dataStore.edit { prefs -> prefs[PreferencesKeys.LOCAL_MODEL_ID] = "" }
                 localLlmDataSource.unloadSession()
+            }
+        }
+    }
+
+    // ── Web Search (Serper.dev) ────────────────────────────────────────────────
+
+    fun onSerperApiKeyChanged(key: String) =
+        _uiState.update { it.copy(serperApiKey = key, serperSavedSuccessfully = false) }
+
+    fun saveSerperApiKey() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isSerperSaving = true) }
+            runCatching {
+                dataStore.edit { prefs ->
+                    prefs[PreferencesKeys.SERPER_API_KEY] = _uiState.value.serperApiKey.trim()
+                }
+                _uiState.update { it.copy(isSerperSaving = false, serperSavedSuccessfully = true) }
+            }.onFailure {
+                _uiState.update { it.copy(isSerperSaving = false) }
             }
         }
     }
