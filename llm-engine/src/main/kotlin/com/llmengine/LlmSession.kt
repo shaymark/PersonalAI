@@ -65,7 +65,7 @@ internal class LlamaCppSession(
     }
 
     // JNI declarations — implemented in llama-bridge.cpp
-    private external fun nativeLoad(path: String, nCtx: Int, nThreads: Int): Long
+    private external fun nativeLoad(path: String, nCtx: Int, nThreads: Int, useGpu: Boolean): Long
     private external fun nativeGenerate(
         handle: Long,
         prompt: String,
@@ -93,7 +93,7 @@ internal class LlamaCppSession(
         require(modelFile.exists()) { "Model file not found: ${modelFile.absolutePath}" }
         require(modelFile.length() > 0) { "Model file is empty" }
 
-        val handle = nativeLoad(modelFile.absolutePath, nCtx = 2048, nThreads = 0)
+        val handle = nativeLoad(modelFile.absolutePath, nCtx = 2048, nThreads = 0, useGpu = params.useGpu)
         if (handle == 0L) error("nativeLoad returned null handle for ${modelFile.name}")
         nativeHandle = handle
         Log.d(TAG, "LlamaCppSession ready: ${modelFile.name}")

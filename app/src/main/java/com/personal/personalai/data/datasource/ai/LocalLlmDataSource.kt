@@ -100,7 +100,14 @@ class LocalLlmDataSource @Inject constructor(
         return withContext(Dispatchers.IO) {
             LlmEngine.load(
                 modelFile = file,
-                params    = EngineParams(maxTokens = 1024, temperature = 0.7f, useGpu = true)
+                // useGpu = false: Qwen3.5 4B is a hybrid SSM+Transformer model.
+                // The Gated Delta Net (SSM) layers are unsupported on Vulkan — they fall back
+                // to CPU, creating 23 GPU↔CPU graph splits per token. This overwhelms the
+                // Adreno 750 Vulkan driver after ~50 s of sustained generation (kgsl-timeline
+                // fences stop signalling → "Failed to link shaders" → SIGSEGV in ggml_vk_mul_mat).
+                // CPU-only via ARM NEON is stable and gives comparable throughput since the GPU
+                // was only accelerating 8/32 transformer layers anyway.
+                params    = EngineParams(maxTokens = 1024, temperature = 0.7f, useGpu = false)
             ).also {
                 currentSession  = it
                 currentModelId  = modelId

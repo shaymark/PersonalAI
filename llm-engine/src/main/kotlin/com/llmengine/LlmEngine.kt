@@ -5,14 +5,22 @@ import java.io.File
 /**
  * Parameters used when loading a GGUF model via llama.cpp.
  *
- * @param maxTokens  Maximum tokens the model may generate per call.
+ * @param maxTokens   Maximum tokens the model may generate per call.
  * @param temperature Sampling temperature (0 = deterministic, 1 = default).
- * @param useGpu     Reserved for future GPU/NNAPI acceleration; currently unused.
+ * @param useGpu      Whether to offload layers to the Vulkan GPU backend.
+ *                    **Disabled by default** for Qwen3.5 4B: the model is a hybrid
+ *                    SSM+Transformer architecture (Gated Delta Net layers). The SSM
+ *                    layers are unsupported on Vulkan and always fall back to CPU,
+ *                    producing 23 GPU↔CPU graph splits per token. This saturates the
+ *                    Adreno 750 Vulkan driver after ~50 s of sustained generation and
+ *                    crashes with SIGSEGV (fault addr 0x8) in ggml_vk_mul_mat.
+ *                    Set to `true` only with a pure-transformer model on a device
+ *                    known to have a stable Vulkan driver.
  */
 data class EngineParams(
     val maxTokens: Int = 1024,
     val temperature: Float = 0.7f,
-    val useGpu: Boolean = true
+    val useGpu: Boolean = false
 )
 
 /**

@@ -103,17 +103,30 @@ extern "C"
 JNIEXPORT jlong JNICALL
 Java_com_llmengine_LlamaCppSession_nativeLoad(
         JNIEnv *env, jobject,
-        jstring jpath,
-        jint    nCtx,
-        jint    nThreads)
+        jstring  jpath,
+        jint     nCtx,
+        jint     nThreads,
+        jboolean useGpu)
 {
     llama_backend_init();
     llama_log_set(log_callback, nullptr);
 
     const char *path = env->GetStringUTFChars(jpath, nullptr);
-    LOGi("Loading model: %s", path);
+    LOGi("Loading model: %s (gpu=%s)", path, useGpu ? "on" : "off");
 
     llama_model_params mparams = llama_model_default_params();
+    // Qwen3.5 4B is a hybrid SSM+Transformer model (full_attention_interval=4):
+    // only 8/32 layers are full-attention; the other 24 are Gated Delta Net (SSM) layers.
+    // llama.cpp b8233 Vulkan backend does NOT support Gated Delta Net — those 24 layers
+    // always fall back to CPU regardless of n_gpu_layers.  This creates 23 GPU↔CPU graph
+    // splits per single-token decode: each split is a Vulkan command-buffer submission plus
+    // a CPU/GPU synchronisation point.  Over ~450 tokens (56 s) the cumulative ~10 000
+    // Vulkan submissions drive the Adreno 750 into a bad state (kgsl-timeline fences stop
+    // signalling), causing "Failed to link shaders" → null pipeline → SIGSEGV fault addr 0x8
+    // inside ggml_vk_mul_mat.  CPU-only via ARM NEON is stable and gives similar throughput
+    // because the GPU was only accelerating the 8 attention layers anyway.
+    // Flip useGpu=true only when using a pure-transformer model on a driver-stable device.
+    mparams.n_gpu_layers = (useGpu == JNI_TRUE) ? 99 : 0;
     llama_model *model = llama_model_load_from_file(path, mparams);
     env->ReleaseStringUTFChars(jpath, path);
 
@@ -197,17 +210,29 @@ Java_com_llmengine_LlamaCppSession_nativeGenerate(
     const int max_batch = static_cast<int>(tokens.size()) + maxTokens + 8;
     llama_batch batch = llama_batch_init(max_batch, 0, 1);
 
-    // ── Decode the prompt ─────────────────────────────────────────────────────
-    for (int i = 0; i < static_cast<int>(tokens.size()); i++) {
-        batch_add(batch, tokens[i], i, false);
-    }
-    if (batch.n_tokens > 0)
-        batch.logits[batch.n_tokens - 1] = 1;  // need logits for last prompt token
+    // ── Decode the prompt (chunked) ───────────────────────────────────────────
+    // Adreno 750 (Snapdragon 8 Gen 3) crashes with VK_ERROR_DEVICE_LOST when a
+    // Vulkan command buffer encodes more than ~32 operations at once (llama.cpp
+    // issue #8743).  Splitting the prompt into chunks of ≤ 32 tokens keeps each
+    // vkQueueSubmit within the driver's limit while still using the GPU.
+    const int ADRENO_MAX_BATCH = 32;
+    const int n_prompt = static_cast<int>(tokens.size());
 
-    if (llama_decode(handle->ctx, batch) != 0) {
-        LOGe("llama_decode() failed during prompt processing");
-        llama_batch_free(batch);
-        return;
+    for (int chunk_start = 0; chunk_start < n_prompt; chunk_start += ADRENO_MAX_BATCH) {
+        batch.n_tokens = 0;
+        const int chunk_end     = std::min(chunk_start + ADRENO_MAX_BATCH, n_prompt);
+        const bool is_last      = (chunk_end == n_prompt);
+
+        for (int i = chunk_start; i < chunk_end; i++) {
+            // Request logits only for the very last prompt token (needed for sampling)
+            batch_add(batch, tokens[i], i, is_last && (i == chunk_end - 1));
+        }
+
+        if (llama_decode(handle->ctx, batch) != 0) {
+            LOGe("llama_decode() failed during prompt chunk %d/%d", chunk_start, n_prompt);
+            llama_batch_free(batch);
+            return;
+        }
     }
 
     // ── Build sampler: temperature + top-p ───────────────────────────────────

@@ -1,3 +1,5 @@
+import com.android.build.gradle.internal.cxx.configure.CmakeProperty
+
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
@@ -9,18 +11,28 @@ android {
     ndkVersion = "27.2.12479018"
 
     defaultConfig {
-        minSdk = 26
+        minSdk = 28   // Vulkan 1.1 (required by llama.cpp) is only in libvulkan.so from API 28+
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles("consumer-rules.pro")
 
+        ndk {
+            // Only build for 64-bit ARM — all modern Android phones.
+            // Skipping x86_64 cuts Vulkan shader compilation time roughly in half.
+            abiFilters += "arm64-v8a"
+        }
+
         externalNativeBuild {
             cmake {
+
                 cppFlags("-std=c++17")
+
                 arguments(
                     "-DANDROID_STL=c++_shared",
                     "-DLLAMA_BUILD_TESTS=OFF",
                     "-DLLAMA_BUILD_EXAMPLES=OFF",
-                    "-DLLAMA_BUILD_SERVER=OFF"
+                    "-DLLAMA_BUILD_SERVER=OFF",
+                    "-DGGML_VULKAN=ON",
+                    "-DCMAKE_BUILD_TYPE=Release"
                 )
             }
         }
