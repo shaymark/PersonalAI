@@ -1,37 +1,39 @@
 package com.llmengine
 
+import android.util.Log
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.Dispatchers
+import java.io.File
+import java.util.concurrent.Executors
+
+private const val TAG = "LlmSession"
 
 /**
- * An active inference session bound to a loaded model.
+ * An active inference session backed by a loaded llama.cpp GGUF model.
  *
- * Obtain an instance via [LlmEngine.load].  Each session holds native resources;
- * call [unload] when done to release them.
+ * Obtain an instance via [LlmEngine.load].  Each session holds the model in RAM;
+ * call [unload] when done to release resources.
  */
 interface LlmSession {
 
-    /** True while native model resources are allocated. */
+    /** True while the model is loaded and ready. */
     val isLoaded: Boolean
 
     /**
      * Stream the model's response to [prompt] token-by-token.
      *
-     * The returned [Flow] is cold — inference starts when the first collector subscribes
-     * and runs on [Dispatchers.IO].  Collecting the flow from the Main thread is safe.
-     *
-     * @param prompt Full prompt string (including any chat template).
-     * @param params Controls temperature, token limit, stop strings, etc.
+     * The returned [Flow] is cold — inference starts on subscription and runs on
+     * a dedicated background thread.  Collecting from the Main thread is safe.
      */
     fun generate(prompt: String, params: GenerationParams = GenerationParams()): Flow<String>
 
     /**
-     * Convenience wrapper that collects [generate] and returns the complete response.
-     * Must be called from a coroutine; suspends until generation finishes.
+     * Convenience wrapper: collects [generate] and returns the complete response.
      */
     suspend fun generateBlocking(
         prompt: String,
@@ -43,56 +45,100 @@ interface LlmSession {
     }
 
     /**
-     * Release native model and context resources.
-     * After calling this, [isLoaded] returns false and further calls to [generate] will throw.
+     * Release the model from RAM.
+     * After this call [isLoaded] is false and further calls to [generate] will throw.
      */
     fun unload()
 }
 
-// ── Internal implementation ───────────────────────────────────────────────────
+// ── llama.cpp JNI implementation ───────────────────────────────────────────────
 
-internal class LlamaSession(private val handle: Long) : LlmSession {
+internal class LlamaCppSession(
+    modelFile: File,
+    private val params: EngineParams
+) : LlmSession {
 
-    @Volatile
-    private var _isLoaded = handle != 0L
+    companion object {
+        init {
+            System.loadLibrary("llama-engine")
+        }
+    }
 
-    override val isLoaded: Boolean get() = _isLoaded
+    // JNI declarations — implemented in llama-bridge.cpp
+    private external fun nativeLoad(path: String, nCtx: Int, nThreads: Int, useGpu: Boolean): Long
+    private external fun nativeGenerate(
+        handle: Long,
+        prompt: String,
+        maxTokens: Int,
+        temperature: Float,
+        topP: Float
+    )
+    private external fun nativeFree(handle: Long)
+
+    // Called from C++ for each decoded token
+    @Suppress("unused")
+    private fun onToken(token: String) {
+        pendingEmit?.invoke(token)
+    }
+
+    @Volatile private var nativeHandle: Long = 0L
+    @Volatile private var pendingEmit: ((String) -> Unit)? = null
+
+    // Single background thread — llama.cpp is not thread-safe per context
+    private val inferenceThread = Executors.newSingleThreadExecutor { r ->
+        Thread(r, "llama-cpp-inference")
+    }
+
+    init {
+        require(modelFile.exists()) { "Model file not found: ${modelFile.absolutePath}" }
+        require(modelFile.length() > 0) { "Model file is empty" }
+
+        val handle = nativeLoad(modelFile.absolutePath, nCtx = 2048, nThreads = 0, useGpu = params.useGpu)
+        if (handle == 0L) error("nativeLoad returned null handle for ${modelFile.name}")
+        nativeHandle = handle
+        Log.d(TAG, "LlamaCppSession ready: ${modelFile.name}")
+    }
+
+    override val isLoaded: Boolean get() = nativeHandle != 0L
 
     override fun generate(prompt: String, params: GenerationParams): Flow<String> =
-        callbackFlow<String> {
-            check(_isLoaded) { "LlmSession has been unloaded" }
+        callbackFlow {
+            check(isLoaded) { "LlmSession has been unloaded" }
+            Log.d(TAG, "generate(): prompt_len=${prompt.length}")
 
-            val stopStrings = params.stopStrings
-            val buffer = StringBuilder()
-            var stopped = false
+            pendingEmit = { token ->
+                trySend(token)
+            }
 
-            LlamaJni.nativeGenerate(
-                handle = handle,
-                prompt = prompt,
-                maxTokens = params.maxTokens,
-                temperature = params.temperature,
-                topP = params.topP,
-                seed = params.seed,
-                callback = object : LlamaJni.TokenCallback {
-                    override fun onToken(piece: String) {
-                        if (stopped) return
-                        buffer.append(piece)
-                        // Check if any stop string appears at the end of the buffer
-                        if (stopStrings.isNotEmpty() && stopStrings.any { buffer.endsWith(it) }) {
-                            stopped = true
-                            return
-                        }
-                        trySend(piece)
-                    }
+            // Run inference on the dedicated thread
+            inferenceThread.submit {
+                try {
+                    nativeGenerate(
+                        handle      = nativeHandle,
+                        prompt      = prompt,
+                        maxTokens   = params.maxTokens,
+                        temperature = params.temperature,
+                        topP        = params.topP
+                    )
+                } catch (e: Exception) {
+                    Log.e(TAG, "nativeGenerate error", e)
+                } finally {
+                    pendingEmit = null
+                    close()
                 }
-            )
-            close()
-        }.buffer(Channel.UNLIMITED).flowOn(Dispatchers.IO)
+            }
+
+            awaitClose { pendingEmit = null }
+        }
+            .buffer(Channel.UNLIMITED)
+            .flowOn(Dispatchers.IO)
 
     override fun unload() {
-        if (_isLoaded) {
-            LlamaJni.nativeFree(handle)
-            _isLoaded = false
+        val handle = nativeHandle
+        if (handle != 0L) {
+            nativeHandle = 0L
+            inferenceThread.submit { nativeFree(handle) }
+            Log.d(TAG, "unload: scheduled nativeFree")
         }
     }
 }

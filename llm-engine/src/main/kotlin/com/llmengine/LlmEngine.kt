@@ -3,70 +3,62 @@ package com.llmengine
 import java.io.File
 
 /**
- * Parameters used when creating a llama.cpp context.
+ * Parameters used when loading a GGUF model via llama.cpp.
  *
- * @param contextSize KV-cache size in tokens (larger = longer context, more RAM).
- * @param threads     CPU thread count for inference (recommend ≤ physical core count).
- * @param gpuLayers   Transformer layers offloaded to GPU via Vulkan (0 = CPU only).
+ * @param maxTokens   Maximum tokens the model may generate per call.
+ * @param temperature Sampling temperature (0 = deterministic, 1 = default).
+ * @param useGpu      Whether to offload layers to the Vulkan GPU backend.
+ *                    **Disabled by default** for Qwen3.5 4B: the model is a hybrid
+ *                    SSM+Transformer architecture (Gated Delta Net layers). The SSM
+ *                    layers are unsupported on Vulkan and always fall back to CPU,
+ *                    producing 23 GPU↔CPU graph splits per token. This saturates the
+ *                    Adreno 750 Vulkan driver after ~50 s of sustained generation and
+ *                    crashes with SIGSEGV (fault addr 0x8) in ggml_vk_mul_mat.
+ *                    Set to `true` only with a pure-transformer model on a device
+ *                    known to have a stable Vulkan driver.
  */
 data class EngineParams(
-    val contextSize: Int = 2048,
-    val threads: Int = 4,
-    val gpuLayers: Int = 0
+    val maxTokens: Int = 1024,
+    val temperature: Float = 0.7f,
+    val useGpu: Boolean = false
 )
 
 /**
- * Entry point for on-device LLM inference.
+ * Entry point for on-device LLM inference via llama.cpp (GGUF format).
  *
  * Usage:
  * ```kotlin
  * // Load model (blocking — call from Dispatchers.IO)
- * val session = LlmEngine.load(modelFile)
+ * val session = LlmEngine.load(context, modelFile)
  *
- * // Stream response
- * session.generate("Hello, who are you?").collect { token -> print(token) }
+ * // Stream response token-by-token
+ * session.generate("Hello!").collect { token -> print(token) }
  *
- * // Release when done
+ * // Release RAM when done
  * session.unload()
  * ```
  */
 object LlmEngine {
 
     /**
-     * Load a GGUF model from [modelFile] and return a ready-to-use [LlmSession].
+     * Load a GGUF model file and return a ready-to-use [LlmSession].
      *
-     * **This is a blocking call** that initialises the llama.cpp backend and allocates
-     * GPU/CPU buffers.  Always call it from a background coroutine:
+     * **This is a blocking call** — always invoke from a background coroutine:
      * ```kotlin
-     * val session = withContext(Dispatchers.IO) { LlmEngine.load(file) }
+     * val session = withContext(Dispatchers.IO) { LlmEngine.load(modelFile) }
      * ```
      *
-     * @param modelFile Absolute path to a `.gguf` model file.  Use [ModelManager] to
-     *                  download models if needed.
-     * @param params    Optional engine configuration (context size, threads, GPU layers).
+     * @param modelFile Absolute path to the `.gguf` model file. Use [ModelManager] to download.
+     * @param params    Optional engine configuration (token limit, temperature).
      * @throws IllegalArgumentException if [modelFile] does not exist.
-     * @throws IllegalStateException    if llama.cpp fails to load the model or create a context.
+     * @throws RuntimeException         if llama.cpp fails to load the model.
      */
-    fun load(modelFile: File, params: EngineParams = EngineParams()): LlmSession {
-        require(modelFile.exists()) {
-            "Model file not found: ${modelFile.absolutePath}"
-        }
-        require(modelFile.length() > 0) {
-            "Model file is empty: ${modelFile.absolutePath}"
-        }
-
-        val handle = LlamaJni.nativeLoadModel(
-            path = modelFile.absolutePath,
-            ctxSize = params.contextSize,
-            nThreads = params.threads,
-            nGpuLayers = params.gpuLayers
-        )
-
-        check(handle != 0L) {
-            "Failed to load model from '${modelFile.name}'. " +
-            "Make sure the file is a valid GGUF model and the device has enough free RAM."
-        }
-
-        return LlamaSession(handle)
+    fun load(
+        modelFile: File,
+        params: EngineParams = EngineParams()
+    ): LlmSession {
+        require(modelFile.exists()) { "Model file not found: ${modelFile.absolutePath}" }
+        require(modelFile.length() > 0) { "Model file is empty: ${modelFile.absolutePath}" }
+        return LlamaCppSession(modelFile, params)
     }
 }

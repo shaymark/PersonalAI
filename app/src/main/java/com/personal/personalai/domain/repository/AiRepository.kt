@@ -8,7 +8,6 @@ import org.json.JSONArray
 import java.io.File
 
 interface AiRepository {
-    suspend fun sendMessage(message: String, chatHistory: List<Message>): Result<String>
     suspend fun sendMessageWithTools(
         conversationItems: JSONArray,
         memories: List<Memory>,

@@ -35,6 +35,7 @@ import com.personal.personalai.data.tools.management.ForgetAllMemoriesTool
 import com.personal.personalai.data.tools.management.ForgetMemoryTool
 import com.personal.personalai.data.tools.management.SaveMemoryTool
 import com.personal.personalai.data.tools.management.ScheduleTaskTool
+import com.personal.personalai.data.tools.web.WebSearchTool
 import com.personal.personalai.domain.audio.AudioRecorder
 import com.personal.personalai.domain.repository.AiRepository
 import com.personal.personalai.domain.repository.ChatRepository
@@ -190,4 +191,9 @@ abstract class ToolModule {
 
     @Binds @IntoSet
     abstract fun bindAddCalendarEventTool(impl: AddCalendarEventTool): AgentTool
+
+    // ── Web tools ──────────────────────────────────────────────────────────────
+
+    @Binds @IntoSet
+    abstract fun bindWebSearchTool(impl: WebSearchTool): AgentTool
 }

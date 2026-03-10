@@ -1,0 +1,41 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(curl -s \"https://raw.githubusercontent.com/ggml-org/llama.cpp/master/examples/llama.android/app/src/main/cpp/CMakeLists.txt\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/ggml-org/llama.cpp/master/ggml/src/ggml-vulkan/CMakeLists.txt\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/ggml-org/llama.cpp/master/cmake/FindVulkan.cmake\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/ggml-org/llama.cpp/master/ggml/cmake/ggml.cmake\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/ggml-org/llama.cpp/master/ggml/CMakeLists.txt\")",
+      "Bash(curl -s \"https://api.github.com/repos/ggml-org/llama.cpp/contents/examples/llama.android\")",
+      "Bash(curl -s \"https://api.github.com/repos/ggml-org/llama.cpp/contents/examples/llama.android/app\")",
+      "Bash(curl -s \"https://api.github.com/repos/ggml-org/llama.cpp/contents/examples/llama.android/lib\")",
+      "Bash(curl -s \"https://api.github.com/repos/ggml-org/llama.cpp/contents/examples/llama.android/lib/src/main/cpp\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/ggml-org/llama.cpp/master/examples/llama.android/lib/build.gradle.kts\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/ggml-org/llama.cpp/master/examples/llama.android/lib/src/main/cpp/CMakeLists.txt\")",
+      "Bash(python3 -c \"import sys,json; [print\\(f[''name'']\\) for f in json.load\\(sys.stdin\\)]\")",
+      "Bash(python3 -c \"import sys,json; data=json.load\\(sys.stdin\\); [print\\(f[''name'']\\) for f in data]\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/ggml-org/llama.cpp/master/ggml/cmake/common.cmake\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/ggml-org/llama.cpp/master/ggml/src/ggml-vulkan/cmake/host-toolchain.cmake.in\")",
+      "Bash(python3 -c \":*)",
+      "Bash(curl -s \"https://raw.githubusercontent.com/ggml-org/llama.cpp/master/ggml/src/ggml-vulkan/vulkan-shaders/CMakeLists.txt\")",
+      "Bash(then)",
+      "Bash(echo \"=== FOUND IN: $f ===\")",
+      "Bash(echo \"$content\")",
+      "Bash(fi)",
+      "Bash(done)",
+      "Bash(# Check if the VulkanHeaders source actually got downloaded ls \"\"/Users/shaymark/Documents/android/claudeApp/PersonalAI/llm-engine/.cxx/Debug/036o5c5z/arm64-v8a/_deps/vulkanheaders-src/\"\")",
+      "Bash(# Good! The headers are there. Now let''s see the actual cmake error by checking the build log or cmake cache # Check what INTERFACE_INCLUDE_DIRECTORIES is set to for Vulkan::Vulkan in the cmake cache cat \"\"/Users/shaymark/Documents/android/claudeApp/PersonalAI/llm-engine/.cxx/Debug/036o5c5z/arm64-v8a/CMakeCache.txt\"\")",
+      "Bash(# Check the full Vulkan_* variables in cmake cache cat \"\"/Users/shaymark/Documents/android/claudeApp/PersonalAI/llm-engine/.cxx/Debug/036o5c5z/arm64-v8a/CMakeCache.txt\"\")",
+      "Bash(# Check for cmake cache in llama-build to see what Vulkan vars it found cat \"\"/Users/shaymark/Documents/android/claudeApp/PersonalAI/llm-engine/.cxx/Debug/036o5c5z/arm64-v8a/_deps/llama-build/CMakeCache.txt\"\")",
+      "Bash(# llama is built as add_subdirectory, so it shares the parent''s cmake scope # The issue is: when llama.cpp calls find_package\\(Vulkan COMPONENTS glslc REQUIRED\\) # inside ggml/src/ggml-vulkan/CMakeLists.txt, what does it find? # # The COMPONENTS glslc REQUIRED means it will fail if glslc is not found # Let''s check if there''s an actual build error log find \"\"/Users/shaymark/Documents/android/claudeApp/PersonalAI/llm-engine/.cxx/Debug/036o5c5z/\"\" -name \"\"*.log\"\")",
+      "Bash(# Now let''s look at what tag b8233 of llama.cpp has for ggml-vulkan CMakeLists.txt # b8233 might be an OLDER version - let''s check that curl -s \"\"https://raw.githubusercontent.com/ggml-org/llama.cpp/b8233/ggml/src/ggml-vulkan/CMakeLists.txt\"\")",
+      "Bash(echo \"=== STATUS: $?\")",
+      "Bash(# At b8233, does it call find_package\\(Vulkan COMPONENTS glslc REQUIRED\\)? # That''s a problem: glslc is not found from NDK on macOS! # Let''s verify what the full b8233 ggml-vulkan cmake does curl -s \"\"https://raw.githubusercontent.com/ggml-org/llama.cpp/b8233/ggml/src/ggml-vulkan/CMakeLists.txt\"\")",
+      "Bash(# Let''s now check what Vulkan_INCLUDE_DIR Android NDK provides on macOS # The NDK sysroot/usr/include should have vulkan/vulkan.h ls \"\"/Users/shaymark/Library/Android/sdk/ndk/27.2.12479018/toolchains/llvm/prebuilt/darwin-x86_64/sysroot/usr/include/vulkan/\"\")",
+      "Bash(# Good - NDK does NOT have vulkan.hpp. Now let''s understand the exact error. # find_package\\(Vulkan COMPONENTS glslc REQUIRED\\) at b8233 tag # When Android NDK is active, CMake''s FindVulkan.cmake will find: # Vulkan_INCLUDE_DIR = NDK sysroot/usr/include # Vulkan_LIBRARY = NDK sysroot libvulkan.so # BUT glslc is NOT in the NDK on macOS \\(it''s in shader-tools/linux-x86_64 which won''t work on macOS\\) # COMPONENTS glslc REQUIRED means it FAILS # Let''s check if glslc exists in the NDK find \"\"/Users/shaymark/Library/Android/sdk/ndk/27.2.12479018/\"\" -name \"\"glslc\"\")",
+      "Bash(wc -l /Users/shaymark/Documents/android/claudeApp/PersonalAI/app/src/main/java/com/personal/personalai/data/tools/*/**.kt)"
+    ]
+  }
+}

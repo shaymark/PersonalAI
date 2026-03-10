@@ -1,13 +1,19 @@
 package com.personal.personalai.presentation.settings
 
+import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.llmengine.DownloadState
+import com.llmengine.ModelDescriptor
+import com.llmengine.ModelManager
+import com.personal.personalai.data.datasource.ai.LocalLlmDataSource
 import com.personal.personalai.domain.repository.ChatRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -16,14 +22,24 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 object PreferencesKeys {
-    val API_KEY = stringPreferencesKey("api_key")
+    val API_KEY        = stringPreferencesKey("api_key")
+    val AI_PROVIDER    = stringPreferencesKey("ai_provider")
+    val LOCAL_MODEL_ID = stringPreferencesKey("local_model_id")
+    val HF_TOKEN       = stringPreferencesKey("hf_token")
+    val OLLAMA_URL     = stringPreferencesKey("ollama_url")
+    val OLLAMA_MODEL   = stringPreferencesKey("ollama_model")
+    val SERPER_API_KEY = stringPreferencesKey("serper_api_key")
 }
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val dataStore: DataStore<Preferences>,
-    private val chatRepository: ChatRepository
+    private val chatRepository: ChatRepository,
+    private val localLlmDataSource: LocalLlmDataSource
 ) : ViewModel() {
+
+    private val modelManager = ModelManager(context)
 
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
@@ -32,13 +48,37 @@ class SettingsViewModel @Inject constructor(
         loadSettings()
     }
 
+    // ── Initialisation ────────────────────────────────────────────────────────
+
     private fun loadSettings() {
         viewModelScope.launch {
             dataStore.data.collect { preferences ->
-                _uiState.update { it.copy(apiKey = preferences[PreferencesKeys.API_KEY] ?: "") }
+                val providerStr  = preferences[PreferencesKeys.AI_PROVIDER] ?: "openai"
+                val provider     = when (providerStr) {
+                    "local_llm" -> AiProvider.LOCAL_LLM
+                    "ollama"    -> AiProvider.OLLAMA
+                    else        -> AiProvider.OPENAI
+                }
+                val selectedId   = preferences[PreferencesKeys.LOCAL_MODEL_ID] ?: ""
+                val downloadedIds = modelManager.listDownloaded().map { it.id }.toSet()
+
+                _uiState.update {
+                    it.copy(
+                        apiKey             = preferences[PreferencesKeys.API_KEY] ?: "",
+                        hfToken            = preferences[PreferencesKeys.HF_TOKEN] ?: "",
+                        aiProvider         = provider,
+                        selectedModelId    = selectedId,
+                        downloadedModelIds = downloadedIds,
+                        ollamaUrl          = preferences[PreferencesKeys.OLLAMA_URL]   ?: "",
+                        ollamaModel        = preferences[PreferencesKeys.OLLAMA_MODEL] ?: "",
+                        serperApiKey       = preferences[PreferencesKeys.SERPER_API_KEY] ?: ""
+                    )
+                }
             }
         }
     }
+
+    // ── OpenAI settings ───────────────────────────────────────────────────────
 
     fun onApiKeyChanged(key: String) =
         _uiState.update { it.copy(apiKey = key, savedSuccessfully = false) }
@@ -55,8 +95,159 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    fun showClearHistoryDialog() = _uiState.update { it.copy(showClearHistoryDialog = true) }
+    // ── HuggingFace token ─────────────────────────────────────────────────────
 
+    fun onHfTokenChanged(token: String) =
+        _uiState.update { it.copy(hfToken = token, hfTokenSavedSuccessfully = false) }
+
+    fun saveHfToken() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isHfTokenSaving = true) }
+            runCatching {
+                dataStore.edit { prefs -> prefs[PreferencesKeys.HF_TOKEN] = _uiState.value.hfToken }
+                _uiState.update { it.copy(isHfTokenSaving = false, hfTokenSavedSuccessfully = true) }
+            }.onFailure {
+                _uiState.update { it.copy(isHfTokenSaving = false) }
+            }
+        }
+    }
+
+    // ── Provider selection ────────────────────────────────────────────────────
+
+    fun setAiProvider(provider: AiProvider) {
+        viewModelScope.launch {
+            dataStore.edit { prefs ->
+                prefs[PreferencesKeys.AI_PROVIDER] = when (provider) {
+                    AiProvider.LOCAL_LLM -> "local_llm"
+                    AiProvider.OLLAMA    -> "ollama"
+                    AiProvider.OPENAI    -> "openai"
+                }
+            }
+            // Free RAM immediately when the user switches away from local mode
+            if (provider != AiProvider.LOCAL_LLM) localLlmDataSource.unloadSession()
+            _uiState.update { it.copy(aiProvider = provider) }
+        }
+    }
+
+    // ── Ollama Dev Mode settings ──────────────────────────────────────────────
+
+    fun onOllamaUrlChanged(url: String) =
+        _uiState.update { it.copy(ollamaUrl = url, ollamaSavedSuccessfully = false) }
+
+    fun onOllamaModelChanged(model: String) =
+        _uiState.update { it.copy(ollamaModel = model, ollamaSavedSuccessfully = false) }
+
+    fun saveOllamaSettings() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isOllamaSaving = true) }
+            runCatching {
+                dataStore.edit { prefs ->
+                    prefs[PreferencesKeys.OLLAMA_URL]   = _uiState.value.ollamaUrl.trim()
+                    prefs[PreferencesKeys.OLLAMA_MODEL] = _uiState.value.ollamaModel.trim()
+                }
+                _uiState.update { it.copy(isOllamaSaving = false, ollamaSavedSuccessfully = true) }
+            }.onFailure {
+                _uiState.update { it.copy(isOllamaSaving = false) }
+            }
+        }
+    }
+
+    // ── Local model management ────────────────────────────────────────────────
+
+    /** Persist the selected model ID so [LocalLlmDataSource] picks it up on next call. */
+    fun selectModel(model: ModelDescriptor) {
+        viewModelScope.launch {
+            dataStore.edit { prefs -> prefs[PreferencesKeys.LOCAL_MODEL_ID] = model.id }
+            _uiState.update { it.copy(selectedModelId = model.id) }
+        }
+    }
+
+    /**
+     * Download [model] from HuggingFace, streaming progress into the UI state.
+     * Auto-selects the model on completion.
+     */
+    fun downloadModel(model: ModelDescriptor) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(downloadingModelId = model.id, downloadError = null) }
+            modelManager.download(model, hfToken = _uiState.value.hfToken).collect { state ->
+                when (state) {
+                    is DownloadState.Progress -> {
+                        _uiState.update {
+                            it.copy(
+                                downloadProgress = it.downloadProgress + (model.id to state.fraction)
+                            )
+                        }
+                    }
+                    is DownloadState.Done -> {
+                        val downloaded = modelManager.listDownloaded().map { it.id }.toSet()
+                        dataStore.edit { prefs -> prefs[PreferencesKeys.LOCAL_MODEL_ID] = model.id }
+                        _uiState.update {
+                            it.copy(
+                                downloadingModelId = null,
+                                downloadedModelIds  = downloaded,
+                                selectedModelId     = model.id,
+                                downloadProgress    = it.downloadProgress - model.id
+                            )
+                        }
+                    }
+                    is DownloadState.Failed -> {
+                        _uiState.update {
+                            it.copy(
+                                downloadingModelId = null,
+                                downloadError      = state.error.message ?: "Download failed",
+                                downloadProgress   = it.downloadProgress - model.id
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /** Delete [model]'s file from disk and update the UI state accordingly. */
+    fun deleteModel(model: ModelDescriptor) {
+        viewModelScope.launch {
+            modelManager.delete(model)
+            val downloaded = modelManager.listDownloaded().map { it.id }.toSet()
+            val selectedId = _uiState.value.selectedModelId
+            _uiState.update {
+                it.copy(
+                    downloadedModelIds = downloaded,
+                    selectedModelId    = if (selectedId == model.id) "" else selectedId
+                )
+            }
+            // Clear the persisted selection if it pointed to the deleted model
+            if (selectedId == model.id) {
+                dataStore.edit { prefs -> prefs[PreferencesKeys.LOCAL_MODEL_ID] = "" }
+                localLlmDataSource.unloadSession()
+            }
+        }
+    }
+
+    // ── Web Search (Serper.dev) ────────────────────────────────────────────────
+
+    fun onSerperApiKeyChanged(key: String) =
+        _uiState.update { it.copy(serperApiKey = key, serperSavedSuccessfully = false) }
+
+    fun saveSerperApiKey() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isSerperSaving = true) }
+            runCatching {
+                dataStore.edit { prefs ->
+                    prefs[PreferencesKeys.SERPER_API_KEY] = _uiState.value.serperApiKey.trim()
+                }
+                _uiState.update { it.copy(isSerperSaving = false, serperSavedSuccessfully = true) }
+            }.onFailure {
+                _uiState.update { it.copy(isSerperSaving = false) }
+            }
+        }
+    }
+
+    fun dismissDownloadError() = _uiState.update { it.copy(downloadError = null) }
+
+    // ── Chat history ──────────────────────────────────────────────────────────
+
+    fun showClearHistoryDialog()    = _uiState.update { it.copy(showClearHistoryDialog = true) }
     fun dismissClearHistoryDialog() = _uiState.update { it.copy(showClearHistoryDialog = false) }
 
     fun clearChatHistory() {

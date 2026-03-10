@@ -11,7 +11,6 @@ import androidx.compose.ui.unit.dp
 import com.personal.personalai.domain.model.Message
 import com.personal.personalai.domain.model.MessageRole
 import com.personal.personalai.domain.usecase.GetChatHistoryUseCase
-import com.personal.personalai.domain.usecase.SendMessageUseCase
 import com.personal.personalai.presentation.chat.ChatScreen
 import com.personal.personalai.presentation.chat.ChatViewModel
 import com.personal.personalai.ui.theme.PersonalAITheme
