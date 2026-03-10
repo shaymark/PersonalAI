@@ -169,6 +169,10 @@ class AgentLoopUseCase @Inject constructor(
                 val t = args.optString("title", "")
                 if (t.isNotBlank()) "📅 Adding to calendar: $t…" else "📅 Adding calendar event…"
             }
+            "open_url" -> {
+                val url = args.optString("url", "")
+                if (url.isNotBlank()) "🌐 Opening $url…" else "🌐 Opening URL…"
+            }
             else -> "🔧 Running $toolName…"
         }
     }

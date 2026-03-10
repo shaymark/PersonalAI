@@ -26,6 +26,7 @@ import com.personal.personalai.data.tools.android.GetClipboardTool
 import com.personal.personalai.data.tools.android.GetInstalledAppsTool
 import com.personal.personalai.data.tools.android.GetLocationTool
 import com.personal.personalai.data.tools.android.OpenAppTool
+import com.personal.personalai.data.tools.android.OpenUrlTool
 import com.personal.personalai.data.tools.android.ReadContactsTool
 import com.personal.personalai.data.tools.android.SendNotificationTool
 import com.personal.personalai.data.tools.android.SendSmsTool
@@ -152,6 +153,9 @@ abstract class ToolModule {
 
     @Binds @IntoSet
     abstract fun bindOpenAppTool(impl: OpenAppTool): AgentTool
+
+    @Binds @IntoSet
+    abstract fun bindOpenUrlTool(impl: OpenUrlTool): AgentTool
 
     @Binds @IntoSet
     abstract fun bindGetInstalledAppsTool(impl: GetInstalledAppsTool): AgentTool
