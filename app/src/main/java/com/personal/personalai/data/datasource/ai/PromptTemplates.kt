@@ -163,6 +163,8 @@ object PromptTemplates {
         }
 
         append("<|im_start|>user\n$userMessage\n<|im_end|>\n")
-        append("<|im_start|>assistant\n")
+        // Pre-fill an empty <think> block so Qwen3.5 skips its chain-of-thought monologue
+        // and responds directly. The model treats a closed </think> tag as "thinking done".
+        append("<|im_start|>assistant\n<think>\n\n</think>\n")
     }
 }
