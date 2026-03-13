@@ -1,5 +1,7 @@
 package com.personal.personalai.presentation.settings
 
+import android.content.Intent
+import android.provider.Settings
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -40,6 +42,7 @@ import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -342,6 +345,42 @@ fun SettingsScreen(
                                 Text(stringResource(R.string.save))
                             }
                         }
+                    }
+                }
+            }
+
+            // ── Quick Assistant card ──────────────────────────────────────────
+            val context = LocalContext.current
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier              = Modifier.padding(16.dp),
+                    verticalArrangement   = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        "Quick Assistant",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Text(
+                        "Use the AI from any app — even when PersonalAI is closed — by setting it as your device's default assistant.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        "How to activate: Settings → Apps → Default Apps → Digital Assistant → select PersonalAI. " +
+                        "Then long-press the Home button (or Side button on Samsung) to open the quick chat overlay.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Button(
+                        onClick = {
+                            context.startActivity(
+                                Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)
+                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Open Default Apps Settings")
                     }
                 }
             }

@@ -52,6 +52,18 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".presentation.quickchat.QuickChatActivity"
+            android:exported="true"
+            android:theme="@style/Theme.PersonalAI.QuickChat"
+            android:launchMode="singleTask"
+            android:showOnLockScreen="true">
+            <intent-filter>
+                <action android:name="android.intent.action.ASSIST" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
         <!-- Remove default WorkManager initializer so Hilt can provide its own -->
         <provider
             android:name="androidx.startup.InitializationProvider"
