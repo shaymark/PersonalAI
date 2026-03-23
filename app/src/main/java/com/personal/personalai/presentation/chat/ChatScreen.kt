@@ -59,7 +59,9 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.res.stringResource
 import com.personal.personalai.R
@@ -99,9 +101,15 @@ fun ChatScreen(
         // If granted: user presses the mic again — standard Android convention
     }
 
+    var initialScrollDone by remember { mutableStateOf(false) }
     LaunchedEffect(uiState.messages.size) {
         if (uiState.messages.isNotEmpty()) {
-            listState.animateScrollToItem(uiState.messages.size - 1)
+            if (!initialScrollDone) {
+                listState.scrollToItem(uiState.messages.size - 1)
+                initialScrollDone = true
+            } else {
+                listState.animateScrollToItem(uiState.messages.size - 1)
+            }
         }
     }
 
