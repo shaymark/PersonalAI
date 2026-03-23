@@ -9,6 +9,8 @@
     <uses-permission android:name="android.permission.READ_CONTACTS" />
     <uses-permission android:name="android.permission.SEND_SMS" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
 
     <!-- Required for Android 11+ package visibility -->
     <queries>
@@ -68,6 +70,20 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
+
+        <!-- Geofence broadcast receiver -->
+        <receiver
+            android:name=".receiver.GeofenceBroadcastReceiver"
+            android:exported="false" />
+
+        <!-- Boot receiver to re-register geofences after device reboot -->
+        <receiver
+            android:name=".receiver.BootReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
 
         <!-- FileProvider for sharing ai_files with other apps (e.g. email) -->
         <provider

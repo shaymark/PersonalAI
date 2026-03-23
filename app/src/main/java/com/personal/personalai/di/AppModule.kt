@@ -2,6 +2,8 @@ package com.personal.personalai.di
 
 import android.content.Context
 import androidx.datastore.core.DataStore
+import com.google.android.gms.location.GeofencingClient
+import com.google.android.gms.location.LocationServices
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.room.Room
@@ -9,19 +11,24 @@ import androidx.work.WorkManager
 import com.personal.personalai.data.local.MIGRATION_1_2
 import com.personal.personalai.data.local.MIGRATION_2_3
 import com.personal.personalai.data.local.MIGRATION_3_4
+import com.personal.personalai.data.local.MIGRATION_4_5
+import com.personal.personalai.data.local.MIGRATION_5_6
 import com.personal.personalai.data.local.PersonalAIDatabase
+import com.personal.personalai.data.local.dao.GeofenceTaskDao
 import com.personal.personalai.data.local.dao.MemoryDao
 import com.personal.personalai.data.local.dao.MessageDao
 import com.personal.personalai.data.local.dao.ScheduledTaskDao
 import com.personal.personalai.data.audio.AudioRecorderImpl
 import com.personal.personalai.data.repository.AiRepositoryImpl
 import com.personal.personalai.data.repository.ChatRepositoryImpl
+import com.personal.personalai.data.repository.GeofenceTaskRepositoryImpl
 import com.personal.personalai.data.repository.MemoryRepositoryImpl
 import com.personal.personalai.data.repository.TaskRepositoryImpl
 import com.personal.personalai.data.tools.ToolRegistryImpl
 import com.personal.personalai.data.tools.android.AddCalendarEventTool
 import com.personal.personalai.data.tools.android.DialPhoneTool
 import com.personal.personalai.data.tools.android.GetBatteryLevelTool
+import com.personal.personalai.data.tools.android.GeocodeAddressTool
 import com.personal.personalai.data.tools.android.GetClipboardTool
 import com.personal.personalai.data.tools.android.GetInstalledAppsTool
 import com.personal.personalai.data.tools.android.GetLocationTool
@@ -37,6 +44,7 @@ import com.personal.personalai.data.tools.management.ForgetAllMemoriesTool
 import com.personal.personalai.data.tools.management.ForgetMemoryTool
 import com.personal.personalai.data.tools.management.SaveMemoryTool
 import com.personal.personalai.data.tools.management.ScheduleTaskTool
+import com.personal.personalai.data.tools.management.SetLocationTaskTool
 import com.personal.personalai.data.tools.files.DeleteFileTool
 import com.personal.personalai.data.tools.files.ListFilesTool
 import com.personal.personalai.data.tools.files.ReadFileTool
@@ -46,6 +54,7 @@ import com.personal.personalai.data.tools.web.WebSearchTool
 import com.personal.personalai.domain.audio.AudioRecorder
 import com.personal.personalai.domain.repository.AiRepository
 import com.personal.personalai.domain.repository.ChatRepository
+import com.personal.personalai.domain.repository.GeofenceTaskRepository
 import com.personal.personalai.domain.repository.MemoryRepository
 import com.personal.personalai.domain.repository.TaskRepository
 import com.personal.personalai.domain.tools.AgentTool
@@ -72,7 +81,7 @@ object DatabaseModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): PersonalAIDatabase =
         Room.databaseBuilder(context, PersonalAIDatabase::class.java, "personal_ai_db")
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
             .build()
 
     @Provides
@@ -83,6 +92,14 @@ object DatabaseModule {
 
     @Provides
     fun provideMemoryDao(db: PersonalAIDatabase): MemoryDao = db.memoryDao()
+
+    @Provides
+    fun provideGeofenceTaskDao(db: PersonalAIDatabase): GeofenceTaskDao = db.geofenceTaskDao()
+
+    @Provides
+    @Singleton
+    fun provideGeofencingClient(@ApplicationContext context: Context): GeofencingClient =
+        LocationServices.getGeofencingClient(context)
 
     @Provides
     @Singleton
@@ -127,6 +144,10 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindMemoryRepository(impl: MemoryRepositoryImpl): MemoryRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindGeofenceTaskRepository(impl: GeofenceTaskRepositoryImpl): GeofenceTaskRepository
 }
 
 @Module
@@ -147,6 +168,9 @@ abstract class ToolModule {
     abstract fun bindScheduleTaskTool(impl: ScheduleTaskTool): AgentTool
 
     @Binds @IntoSet
+    abstract fun bindSetLocationTaskTool(impl: SetLocationTaskTool): AgentTool
+
+    @Binds @IntoSet
     abstract fun bindSaveMemoryTool(impl: SaveMemoryTool): AgentTool
 
     @Binds @IntoSet
@@ -159,6 +183,9 @@ abstract class ToolModule {
 
     @Binds @IntoSet
     abstract fun bindOpenAppTool(impl: OpenAppTool): AgentTool
+
+    @Binds @IntoSet
+    abstract fun bindGeocodeAddressTool(impl: GeocodeAddressTool): AgentTool
 
     @Binds @IntoSet
     abstract fun bindOpenUrlTool(impl: OpenUrlTool): AgentTool

@@ -3,6 +3,7 @@ package com.personal.personalai.presentation.navigation
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -19,6 +20,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.personal.personalai.presentation.chat.ChatScreen
+import com.personal.personalai.presentation.locationtasks.LocationTasksScreen
 import com.personal.personalai.presentation.schedule.ScheduledTasksScreen
 import com.personal.personalai.presentation.settings.SettingsScreen
 
@@ -28,7 +30,7 @@ fun AppNavGraph() {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
 
-    val bottomNavScreens = listOf(Screen.Chat, Screen.ScheduledTasks)
+    val bottomNavScreens = listOf(Screen.Chat, Screen.ScheduledTasks, Screen.LocationTasks)
 
     Scaffold(
         bottomBar = {
@@ -39,6 +41,7 @@ fun AppNavGraph() {
                             when (screen) {
                                 Screen.Chat -> Icon(Icons.Default.Home, contentDescription = stringResource(R.string.nav_chat))
                                 Screen.ScheduledTasks -> Icon(Icons.Default.DateRange, contentDescription = stringResource(R.string.nav_schedule))
+                                Screen.LocationTasks -> Icon(Icons.Default.LocationOn, contentDescription = "Places")
                                 else -> Unit
                             }
                         },
@@ -47,6 +50,7 @@ fun AppNavGraph() {
                                 when (screen) {
                                     Screen.Chat -> stringResource(R.string.nav_chat)
                                     Screen.ScheduledTasks -> stringResource(R.string.nav_schedule)
+                                    Screen.LocationTasks -> "Places"
                                     else -> ""
                                 }
                             )
@@ -78,6 +82,9 @@ fun AppNavGraph() {
             }
             composable(Screen.ScheduledTasks.route) {
                 ScheduledTasksScreen(innerPadding = innerPadding)
+            }
+            composable(Screen.LocationTasks.route) {
+                LocationTasksScreen(innerPadding = innerPadding)
             }
             composable(Screen.Settings.route) {
                 SettingsScreen(

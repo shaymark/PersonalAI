@@ -4,9 +4,11 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.personal.personalai.data.local.dao.GeofenceTaskDao
 import com.personal.personalai.data.local.dao.MemoryDao
 import com.personal.personalai.data.local.dao.MessageDao
 import com.personal.personalai.data.local.dao.ScheduledTaskDao
+import com.personal.personalai.data.local.entity.GeofenceTaskEntity
 import com.personal.personalai.data.local.entity.MemoryEntity
 import com.personal.personalai.data.local.entity.MessageEntity
 import com.personal.personalai.data.local.entity.ScheduledTaskEntity
@@ -40,13 +42,43 @@ val MIGRATION_3_4 = object : Migration(3, 4) {
     }
 }
 
+val MIGRATION_4_5 = object : Migration(4, 5) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        database.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS geofence_tasks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                title TEXT NOT NULL,
+                latitude REAL NOT NULL,
+                longitude REAL NOT NULL,
+                radiusMeters REAL NOT NULL DEFAULT 100.0,
+                transitionType TEXT NOT NULL DEFAULT 'ENTER',
+                taskType TEXT NOT NULL DEFAULT 'REMINDER',
+                description TEXT NOT NULL DEFAULT '',
+                aiPrompt TEXT,
+                outputTarget TEXT NOT NULL DEFAULT 'NOTIFICATION',
+                isActive INTEGER NOT NULL DEFAULT 1,
+                createdAt INTEGER NOT NULL
+            )
+            """.trimIndent()
+        )
+    }
+}
+
+val MIGRATION_5_6 = object : Migration(5, 6) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        database.execSQL("ALTER TABLE geofence_tasks ADD COLUMN locationName TEXT NOT NULL DEFAULT ''")
+    }
+}
+
 @Database(
-    entities = [MessageEntity::class, ScheduledTaskEntity::class, MemoryEntity::class],
-    version = 4,
+    entities = [MessageEntity::class, ScheduledTaskEntity::class, MemoryEntity::class, GeofenceTaskEntity::class],
+    version = 6,
     exportSchema = false
 )
 abstract class PersonalAIDatabase : RoomDatabase() {
     abstract fun messageDao(): MessageDao
     abstract fun scheduledTaskDao(): ScheduledTaskDao
     abstract fun memoryDao(): MemoryDao
+    abstract fun geofenceTaskDao(): GeofenceTaskDao
 }
