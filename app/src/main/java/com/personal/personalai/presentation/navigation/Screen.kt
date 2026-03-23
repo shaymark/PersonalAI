@@ -4,5 +4,6 @@ sealed class Screen(val route: String) {
     object Chat : Screen("chat")
     object ScheduledTasks : Screen("scheduled_tasks")
     object LocationTasks : Screen("location_tasks")
+    object Library : Screen("library")
     object Settings : Screen("settings")
 }

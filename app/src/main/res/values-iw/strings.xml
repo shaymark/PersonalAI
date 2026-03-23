@@ -122,6 +122,17 @@
     <string name="transition_exit">יציאה</string>
     <string name="transition_both">שניהם</string>
 
+    <!-- Library screen -->
+    <string name="nav_library">ספרייה</string>
+    <string name="library_title">ספרייה</string>
+    <string name="library_tab_files">קבצים</string>
+    <string name="library_tab_memories">זיכרונות</string>
+    <string name="library_no_files">אין קבצים שמורים עדיין</string>
+    <string name="library_no_memories">אין זיכרונות שמורים</string>
+    <string name="library_copy_all">העתק הכל</string>
+    <string name="library_delete_memory_title">מחק זיכרון</string>
+    <string name="library_delete_memory_message">האם אתה בטוח שברצונך למחוק את הזיכרון הזה?</string>
+
     <!-- Navigation -->
     <string name="nav_chat">צ\'אט</string>
     <string name="nav_schedule">לוח זמנים</string>

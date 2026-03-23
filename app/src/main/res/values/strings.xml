@@ -122,6 +122,17 @@
     <string name="transition_exit">Exit</string>
     <string name="transition_both">Both</string>
 
+    <!-- Library screen -->
+    <string name="nav_library">Library</string>
+    <string name="library_title">Library</string>
+    <string name="library_tab_files">Files</string>
+    <string name="library_tab_memories">Memories</string>
+    <string name="library_no_files">No files saved yet</string>
+    <string name="library_no_memories">No memories saved</string>
+    <string name="library_copy_all">Copy All</string>
+    <string name="library_delete_memory_title">Delete Memory</string>
+    <string name="library_delete_memory_message">Are you sure you want to delete this memory?</string>
+
     <!-- Navigation -->
     <string name="nav_chat">Chat</string>
     <string name="nav_schedule">Schedule</string>
