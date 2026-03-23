@@ -26,6 +26,37 @@
     <string name="clear_chat_confirm_message">פעולה זו תמחק לצמיתות את כל ההודעות. לא ניתן לבטל פעולה זו.</string>
     <string name="clear">נקה</string>
     <string name="cancel">ביטול</string>
+    <string name="ok">אישור</string>
+
+    <!-- Local LLM settings -->
+    <string name="ai_provider_openai">OpenAI (ענן)</string>
+    <string name="ai_provider_local">מודל מקומי</string>
+    <string name="local_llm_note">פועל לחלוטין על המכשיר — ללא אינטרנט או מפתח API.\nתזכורות ותגיות זיכרון עדיין פועלים דרך הוראות טקסט.</string>
+    <string name="hf_token_section_title">טוקן גישה ל-HuggingFace</string>
+    <string name="hf_token_note">נדרש להורדת מודלי Gemma מוגנים. אשר/י את הרישיון של Gemma ב-HuggingFace, ולאחר מכן צור/י טוקן קריאה בכתובת huggingface.co/settings/tokens.</string>
+    <string name="hf_token_label">טוקן HuggingFace (hf_…)</string>
+    <string name="hf_token_saved">נשמר ✓</string>
+
+    <!-- Ollama Dev Mode settings -->
+    <string name="ai_provider_ollama">פיתוח (Ollama)</string>
+    <string name="ollama_note">מתחבר לשרת Ollama מקומי (v0.13.3+) דרך Responses API. תומך בקריאות פונקציות וחיפוש ברשת. שני המכשירים חייבים להיות על אותה רשת Wi-Fi.</string>
+    <string name="ollama_url_label">כתובת שרת</string>
+    <string name="ollama_model_label">תגית מודל</string>
+    <string name="ollama_saved">נשמר ✓</string>
+
+    <string name="local_models_title">מודלים זמינים</string>
+    <string name="download">הורד</string>
+    <string name="downloading">מוריד…</string>
+    <string name="downloading_model">מוריד %1$s</string>
+    <string name="select_model">בחר</string>
+    <string name="model_selected">נבחר</string>
+    <string name="download_failed_title">ההורדה נכשלה</string>
+
+    <!-- Web Search settings -->
+    <string name="web_search_title">חיפוש באינטרנט</string>
+    <string name="web_search_note">מאפשר חיפוש ברשת עבור כל ספקי ה-AI (Ollama, מקומי ו-OpenAI). קבל/י מפתח Serper API חינמי בכתובת serper.dev — 2,500 חיפושים לחודש, ללא כרטיס אשראי.</string>
+    <string name="serper_api_key_label">מפתח Serper API</string>
+    <string name="serper_saved">נשמר ✓</string>
 
     <!-- Scheduled tasks screen -->
     <string name="scheduled_tasks_title">משימות מתוזמנות</string>
@@ -64,6 +95,32 @@
     <string name="delete_task_message">\"%1$s\" תוסר לצמיתות. פעולה זו אינה ניתנת לביטול.</string>
     <string name="delete">מחק</string>
     <string name="delete_task">מחק משימה</string>
+
+    <!-- Location tasks screen -->
+    <string name="nav_places">מיקומים</string>
+    <string name="location_tasks_title">משימות מיקום</string>
+    <string name="add_location_task_description">הוסף משימת מיקום</string>
+    <string name="no_location_tasks">אין משימות מיקום</string>
+    <string name="no_location_tasks_body">לחץ/י + להוסיף משימה שתופעל כשתגיע/י למקום מסוים</string>
+    <string name="add_location_task_dialog_title">הוסף משימת מיקום</string>
+    <string name="edit_location_task_dialog_title">ערוך משימת מיקום</string>
+    <string name="address_label">כתובת או שם מקום</string>
+    <string name="find">חפש</string>
+    <string name="latitude_label">קו רוחב *</string>
+    <string name="longitude_label">קו אורך *</string>
+    <string name="radius_label">רדיוס: %1$d מטר</string>
+    <string name="trigger_label">הפעלה</string>
+    <string name="task_type_section_label">סוג משימה</string>
+    <string name="notification_message_label">הודעת התראה</string>
+    <string name="ai_prompt_label">פקודת AI *</string>
+    <string name="output_label">פלט</string>
+    <string name="delete_location_task">מחק משימה</string>
+    <string name="delete_location_task_confirm_title">מחק משימה</string>
+    <string name="delete_location_task_confirm_message">האם אתה בטוח שברצונך למחוק את משימת המיקום הזו?</string>
+    <string name="add">הוסף</string>
+    <string name="transition_enter">כניסה</string>
+    <string name="transition_exit">יציאה</string>
+    <string name="transition_both">שניהם</string>
 
     <!-- Navigation -->
     <string name="nav_chat">צ\'אט</string>

@@ -41,7 +41,7 @@ fun AppNavGraph() {
                             when (screen) {
                                 Screen.Chat -> Icon(Icons.Default.Home, contentDescription = stringResource(R.string.nav_chat))
                                 Screen.ScheduledTasks -> Icon(Icons.Default.DateRange, contentDescription = stringResource(R.string.nav_schedule))
-                                Screen.LocationTasks -> Icon(Icons.Default.LocationOn, contentDescription = "Places")
+                                Screen.LocationTasks -> Icon(Icons.Default.LocationOn, contentDescription = stringResource(R.string.nav_places))
                                 else -> Unit
                             }
                         },
@@ -50,7 +50,7 @@ fun AppNavGraph() {
                                 when (screen) {
                                     Screen.Chat -> stringResource(R.string.nav_chat)
                                     Screen.ScheduledTasks -> stringResource(R.string.nav_schedule)
-                                    Screen.LocationTasks -> "Places"
+                                    Screen.LocationTasks -> stringResource(R.string.nav_places)
                                     else -> ""
                                 }
                             )

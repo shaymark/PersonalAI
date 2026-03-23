@@ -19,7 +19,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
@@ -30,7 +29,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
@@ -45,13 +43,17 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.personal.personalai.R
 import com.personal.personalai.domain.model.GeofenceTask
 import com.personal.personalai.domain.model.GeofenceTransitionType
 import com.personal.personalai.domain.model.OutputTarget
@@ -76,7 +78,7 @@ fun LocationTasksScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Location Tasks") },
+                title = { Text(stringResource(R.string.location_tasks_title)) },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer
                 )
@@ -87,7 +89,7 @@ fun LocationTasksScreen(
                 onClick = viewModel::showAddDialog,
                 modifier = Modifier.padding(bottom = innerPadding.calculateBottomPadding())
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Add location task")
+                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add_location_task_description))
             }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
@@ -110,10 +112,10 @@ fun LocationTasksScreen(
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(Modifier.height(12.dp))
-                    Text("No location tasks", style = MaterialTheme.typography.bodyLarge)
+                    Text(stringResource(R.string.no_location_tasks), style = MaterialTheme.typography.bodyLarge)
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        "Tap + to add a task that triggers when you arrive somewhere",
+                        stringResource(R.string.no_location_tasks_body),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(horizontal = 32.dp)
@@ -127,8 +129,7 @@ fun LocationTasksScreen(
                     items(uiState.tasks, key = { it.id }) { task ->
                         LocationTaskCard(
                             task = task,
-                            onEdit = { viewModel.showEditDialog(task) },
-                            onDelete = { viewModel.deleteTask(task) }
+                            onEdit = { viewModel.showEditDialog(task) }
                         )
                     }
                 }
@@ -169,8 +170,7 @@ fun LocationTasksScreen(
 @Composable
 private fun LocationTaskCard(
     task: GeofenceTask,
-    onEdit: () -> Unit,
-    onDelete: () -> Unit
+    onEdit: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -192,8 +192,13 @@ private fun LocationTaskCard(
                 val locationLine = task.locationName.ifBlank {
                     "%.5f, %.5f".format(task.latitude, task.longitude)
                 }
+                val transitionLabel = when (task.transitionType) {
+                    GeofenceTransitionType.ENTER -> stringResource(R.string.transition_enter)
+                    GeofenceTransitionType.EXIT -> stringResource(R.string.transition_exit)
+                    GeofenceTransitionType.BOTH -> stringResource(R.string.transition_both)
+                }
                 Text(
-                    "$locationLine  •  ${task.radiusMeters.toInt()}m  •  ${task.transitionType.name.lowercase()}",
+                    "$locationLine  •  ${task.radiusMeters.toInt()}m  •  ${transitionLabel.lowercase()}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -205,13 +210,6 @@ private fun LocationTaskCard(
                 } else if (task.description.isNotBlank()) {
                     Text(task.description, style = MaterialTheme.typography.bodySmall)
                 }
-            }
-            IconButton(onClick = onDelete) {
-                Icon(
-                    Icons.Default.Delete,
-                    contentDescription = "Delete",
-                    tint = MaterialTheme.colorScheme.error
-                )
             }
         }
     }
@@ -236,14 +234,55 @@ private fun LocationTaskDialog(
     onAiPromptChanged: (String) -> Unit,
     onOutputTargetChanged: (OutputTarget) -> Unit
 ) {
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text(stringResource(R.string.delete_location_task_confirm_title)) },
+            text = { Text(stringResource(R.string.delete_location_task_confirm_message)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDeleteConfirm = false
+                    onDelete()
+                }) { Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) { Text(stringResource(R.string.cancel)) }
+            }
+        )
+    }
+
     val isValid = uiState.formTitle.isNotBlank() &&
             uiState.formLat.toDoubleOrNull() != null &&
             uiState.formLng.toDoubleOrNull() != null &&
             (uiState.formTaskType == TaskType.REMINDER || uiState.formAiPrompt.isNotBlank())
 
+    val transitionLabels = mapOf(
+        GeofenceTransitionType.ENTER to stringResource(R.string.transition_enter),
+        GeofenceTransitionType.EXIT to stringResource(R.string.transition_exit),
+        GeofenceTransitionType.BOTH to stringResource(R.string.transition_both)
+    )
+    val taskTypeLabels = mapOf(
+        TaskType.REMINDER to stringResource(R.string.reminder),
+        TaskType.AI_PROMPT to stringResource(R.string.ai_task)
+    )
+    val outputTargetLabels = mapOf(
+        OutputTarget.NOTIFICATION to stringResource(R.string.notification),
+        OutputTarget.CHAT to stringResource(R.string.chat),
+        OutputTarget.BOTH to stringResource(R.string.both)
+    )
+
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (isEditing) "Edit Location Task" else "Add Location Task") },
+        title = {
+            Text(
+                stringResource(
+                    if (isEditing) R.string.edit_location_task_dialog_title
+                    else R.string.add_location_task_dialog_title
+                )
+            )
+        },
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
@@ -252,7 +291,7 @@ private fun LocationTaskDialog(
                 OutlinedTextField(
                     value = uiState.formTitle,
                     onValueChange = onTitleChanged,
-                    label = { Text("Title *") },
+                    label = { Text(stringResource(R.string.task_title_label)) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
@@ -265,7 +304,7 @@ private fun LocationTaskDialog(
                     OutlinedTextField(
                         value = uiState.formAddress,
                         onValueChange = onAddressChanged,
-                        label = { Text("Address or place name") },
+                        label = { Text(stringResource(R.string.address_label)) },
                         modifier = Modifier.weight(1f),
                         singleLine = true,
                         trailingIcon = {
@@ -278,7 +317,7 @@ private fun LocationTaskDialog(
                         onClick = onGeocodeAddress,
                         enabled = uiState.formAddress.isNotBlank() && !uiState.isGeocodingAddress
                     ) {
-                        Icon(Icons.Default.Search, contentDescription = "Find", modifier = Modifier.size(18.dp))
+                        Icon(Icons.Default.Search, contentDescription = stringResource(R.string.find), modifier = Modifier.size(18.dp))
                     }
                 }
 
@@ -289,7 +328,7 @@ private fun LocationTaskDialog(
                     OutlinedTextField(
                         value = uiState.formLat,
                         onValueChange = onLatChanged,
-                        label = { Text("Latitude *") },
+                        label = { Text(stringResource(R.string.latitude_label)) },
                         modifier = Modifier.weight(1f),
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
@@ -297,14 +336,17 @@ private fun LocationTaskDialog(
                     OutlinedTextField(
                         value = uiState.formLng,
                         onValueChange = onLngChanged,
-                        label = { Text("Longitude *") },
+                        label = { Text(stringResource(R.string.longitude_label)) },
                         modifier = Modifier.weight(1f),
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
                     )
                 }
 
-                Text("Radius: ${uiState.formRadius.toInt()} m", style = MaterialTheme.typography.bodySmall)
+                Text(
+                    stringResource(R.string.radius_label, uiState.formRadius.toInt()),
+                    style = MaterialTheme.typography.bodySmall
+                )
                 Slider(
                     value = uiState.formRadius,
                     onValueChange = onRadiusChanged,
@@ -312,25 +354,25 @@ private fun LocationTaskDialog(
                     steps = 18
                 )
 
-                Text("Trigger", style = MaterialTheme.typography.labelMedium)
+                Text(stringResource(R.string.trigger_label), style = MaterialTheme.typography.labelMedium)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     GeofenceTransitionType.entries.forEach { type ->
                         RadioButton(
                             selected = uiState.formTransition == type,
                             onClick = { onTransitionChanged(type) }
                         )
-                        Text(type.name.lowercase(), modifier = Modifier.padding(end = 12.dp))
+                        Text(transitionLabels[type] ?: type.name, modifier = Modifier.padding(end = 12.dp))
                     }
                 }
 
-                Text("Task Type", style = MaterialTheme.typography.labelMedium)
+                Text(stringResource(R.string.task_type_section_label), style = MaterialTheme.typography.labelMedium)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     TaskType.entries.forEach { type ->
                         RadioButton(
                             selected = uiState.formTaskType == type,
                             onClick = { onTaskTypeChanged(type) }
                         )
-                        Text(type.name.lowercase().replace('_', ' '), modifier = Modifier.padding(end = 12.dp))
+                        Text(taskTypeLabels[type] ?: type.name, modifier = Modifier.padding(end = 12.dp))
                     }
                 }
 
@@ -338,43 +380,43 @@ private fun LocationTaskDialog(
                     OutlinedTextField(
                         value = uiState.formDescription,
                         onValueChange = onDescriptionChanged,
-                        label = { Text("Notification message") },
+                        label = { Text(stringResource(R.string.notification_message_label)) },
                         modifier = Modifier.fillMaxWidth()
                     )
                 } else {
                     OutlinedTextField(
                         value = uiState.formAiPrompt,
                         onValueChange = onAiPromptChanged,
-                        label = { Text("AI Prompt *") },
+                        label = { Text(stringResource(R.string.ai_prompt_label)) },
                         modifier = Modifier.fillMaxWidth(),
                         minLines = 2
                     )
-                    Text("Output", style = MaterialTheme.typography.labelMedium)
+                    Text(stringResource(R.string.output_label), style = MaterialTheme.typography.labelMedium)
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         OutputTarget.entries.forEach { target ->
                             RadioButton(
                                 selected = uiState.formOutputTarget == target,
                                 onClick = { onOutputTargetChanged(target) }
                             )
-                            Text(target.name.lowercase(), modifier = Modifier.padding(end = 8.dp))
+                            Text(outputTargetLabels[target] ?: target.name, modifier = Modifier.padding(end = 8.dp))
                         }
                     }
                 }
 
                 if (isEditing) {
-                    TextButton(onClick = onDelete, modifier = Modifier.fillMaxWidth()) {
-                        Text("Delete Task", color = MaterialTheme.colorScheme.error)
+                    TextButton(onClick = { showDeleteConfirm = true }, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.delete_location_task), color = MaterialTheme.colorScheme.error)
                     }
                 }
             }
         },
         confirmButton = {
             TextButton(onClick = onSave, enabled = isValid) {
-                Text(if (isEditing) "Save" else "Add")
+                Text(stringResource(if (isEditing) R.string.save else R.string.add))
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
         }
     )
 }

@@ -96,6 +96,32 @@
     <string name="delete">Delete</string>
     <string name="delete_task">Delete task</string>
 
+    <!-- Location tasks screen -->
+    <string name="nav_places">Places</string>
+    <string name="location_tasks_title">Location Tasks</string>
+    <string name="add_location_task_description">Add location task</string>
+    <string name="no_location_tasks">No location tasks</string>
+    <string name="no_location_tasks_body">Tap + to add a task that triggers when you arrive somewhere</string>
+    <string name="add_location_task_dialog_title">Add Location Task</string>
+    <string name="edit_location_task_dialog_title">Edit Location Task</string>
+    <string name="address_label">Address or place name</string>
+    <string name="find">Find</string>
+    <string name="latitude_label">Latitude *</string>
+    <string name="longitude_label">Longitude *</string>
+    <string name="radius_label">Radius: %1$d m</string>
+    <string name="trigger_label">Trigger</string>
+    <string name="task_type_section_label">Task Type</string>
+    <string name="notification_message_label">Notification message</string>
+    <string name="ai_prompt_label">AI Prompt *</string>
+    <string name="output_label">Output</string>
+    <string name="delete_location_task">Delete Task</string>
+    <string name="delete_location_task_confirm_title">Delete Task</string>
+    <string name="delete_location_task_confirm_message">Are you sure you want to delete this location task?</string>
+    <string name="add">Add</string>
+    <string name="transition_enter">Enter</string>
+    <string name="transition_exit">Exit</string>
+    <string name="transition_both">Both</string>
+
     <!-- Navigation -->
     <string name="nav_chat">Chat</string>
     <string name="nav_schedule">Schedule</string>

@@ -122,7 +122,7 @@ class LocationTasksViewModel @Inject constructor(
             val geocoder = Geocoder(context)
             try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    suspendCancellableCoroutine { cont ->
+                    suspendCancellableCoroutine<Triple<Double, Double, String>?> { cont ->
                         geocoder.getFromLocationName(address, 1) { results ->
                             val loc = results.firstOrNull()
                             cont.resume(
