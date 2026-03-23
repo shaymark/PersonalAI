@@ -29,6 +29,7 @@ import com.personal.personalai.data.tools.android.OpenAppTool
 import com.personal.personalai.data.tools.android.OpenUrlTool
 import com.personal.personalai.data.tools.android.ReadContactsTool
 import com.personal.personalai.data.tools.android.SendNotificationTool
+import com.personal.personalai.data.tools.android.SendMessageTool
 import com.personal.personalai.data.tools.android.SendSmsTool
 import com.personal.personalai.data.tools.android.SetAlarmTool
 import com.personal.personalai.data.tools.interaction.AskUserTool
@@ -36,6 +37,11 @@ import com.personal.personalai.data.tools.management.ForgetAllMemoriesTool
 import com.personal.personalai.data.tools.management.ForgetMemoryTool
 import com.personal.personalai.data.tools.management.SaveMemoryTool
 import com.personal.personalai.data.tools.management.ScheduleTaskTool
+import com.personal.personalai.data.tools.files.DeleteFileTool
+import com.personal.personalai.data.tools.files.ListFilesTool
+import com.personal.personalai.data.tools.files.ReadFileTool
+import com.personal.personalai.data.tools.files.ShareFileTool
+import com.personal.personalai.data.tools.files.WriteFileTool
 import com.personal.personalai.data.tools.web.WebSearchTool
 import com.personal.personalai.domain.audio.AudioRecorder
 import com.personal.personalai.domain.repository.AiRepository
@@ -177,6 +183,9 @@ abstract class ToolModule {
     abstract fun bindSendSmsTool(impl: SendSmsTool): AgentTool
 
     @Binds @IntoSet
+    abstract fun bindSendMessageTool(impl: SendMessageTool): AgentTool
+
+    @Binds @IntoSet
     abstract fun bindDialPhoneTool(impl: DialPhoneTool): AgentTool
 
     // ── Device tools ──────────────────────────────────────────────────────────
@@ -200,4 +209,21 @@ abstract class ToolModule {
 
     @Binds @IntoSet
     abstract fun bindWebSearchTool(impl: WebSearchTool): AgentTool
+
+    // ── File tools ─────────────────────────────────────────────────────────────
+
+    @Binds @IntoSet
+    abstract fun bindWriteFileTool(impl: WriteFileTool): AgentTool
+
+    @Binds @IntoSet
+    abstract fun bindReadFileTool(impl: ReadFileTool): AgentTool
+
+    @Binds @IntoSet
+    abstract fun bindListFilesTool(impl: ListFilesTool): AgentTool
+
+    @Binds @IntoSet
+    abstract fun bindDeleteFileTool(impl: DeleteFileTool): AgentTool
+
+    @Binds @IntoSet
+    abstract fun bindShareFileTool(impl: ShareFileTool): AgentTool
 }
