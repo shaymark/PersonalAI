@@ -119,6 +119,4 @@ dependencies {
     androidTestImplementation(libs.mockk.android)
     androidTestImplementation(libs.androidx.test.runner)
     kspAndroidTest(libs.hilt.compiler)
-
-    implementation(project(":llm-engine"))
 }

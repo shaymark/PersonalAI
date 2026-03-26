@@ -28,14 +28,8 @@
     <string name="cancel">Cancel</string>
     <string name="ok">OK</string>
 
-    <!-- Local LLM settings -->
+    <!-- AI Backend settings -->
     <string name="ai_provider_openai">OpenAI (Cloud)</string>
-    <string name="ai_provider_local">Local LLM</string>
-    <string name="local_llm_note">Runs fully on-device — no internet or API key required.\nReminders and memory tags still work via text instructions.</string>
-    <string name="hf_token_section_title">HuggingFace Access Token</string>
-    <string name="hf_token_note">Required to download gated Gemma models. Accept the Gemma licence on HuggingFace, then generate a Read token at huggingface.co/settings/tokens.</string>
-    <string name="hf_token_label">HuggingFace Token (hf_…)</string>
-    <string name="hf_token_saved">Saved ✓</string>
 
     <!-- Ollama Dev Mode settings -->
     <string name="ai_provider_ollama">Dev (Ollama)</string>
@@ -44,17 +38,9 @@
     <string name="ollama_model_label">Model Tag</string>
     <string name="ollama_saved">Saved ✓</string>
 
-    <string name="local_models_title">Available Models</string>
-    <string name="download">Download</string>
-    <string name="downloading">Downloading…</string>
-    <string name="downloading_model">Downloading %1$s</string>
-    <string name="select_model">Select</string>
-    <string name="model_selected">Selected</string>
-    <string name="download_failed_title">Download Failed</string>
-
     <!-- Web Search settings -->
     <string name="web_search_title">Web Search</string>
-    <string name="web_search_note">Enables real web search for all AI providers (Ollama, Local LLM, and OpenAI). Get a free Serper API key at serper.dev — 2,500 searches/month, no credit card required.</string>
+    <string name="web_search_note">Enables real web search for all AI providers (OpenAI and Ollama). Get a free Serper API key at serper.dev — 2,500 searches/month, no credit card required.</string>
     <string name="serper_api_key_label">Serper API Key</string>
     <string name="serper_saved">Saved ✓</string>
 

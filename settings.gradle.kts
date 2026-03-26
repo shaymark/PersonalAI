@@ -21,4 +21,3 @@ dependencyResolutionManagement {
 
 rootProject.name = "PersonalAI"
 include(":app")
-include(":llm-engine")
