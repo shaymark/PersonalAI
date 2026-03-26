@@ -1,11 +1,13 @@
 package com.personal.personalai.receiver
 
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import com.personal.personalai.MainActivity
 import com.google.android.gms.location.GeofencingEvent
 import com.personal.personalai.domain.model.GeofenceTask
 import com.personal.personalai.domain.model.Message
@@ -94,12 +96,23 @@ class GeofenceBroadcastReceiver : BroadcastReceiver() {
         }
     }
 
+    private fun createLaunchPendingIntent(context: Context): PendingIntent {
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        return PendingIntent.getActivity(
+            context, 0, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+    }
+
     private fun showSimpleNotification(context: Context, title: String, description: String) {
         val notification = NotificationCompat.Builder(context, TaskReminderWorker.CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle(title)
             .setContentText(description.ifEmpty { "Location reminder" })
             .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setContentIntent(createLaunchPendingIntent(context))
             .setAutoCancel(true)
             .build()
         context.getSystemService(NotificationManager::class.java)
@@ -113,6 +126,7 @@ class GeofenceBroadcastReceiver : BroadcastReceiver() {
             .setContentText(aiResponse.take(100))
             .setStyle(NotificationCompat.BigTextStyle().bigText(aiResponse))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setContentIntent(createLaunchPendingIntent(context))
             .setAutoCancel(true)
             .build()
         context.getSystemService(NotificationManager::class.java)
@@ -125,6 +139,7 @@ class GeofenceBroadcastReceiver : BroadcastReceiver() {
             .setContentTitle(title)
             .setContentText("Location AI task failed to run")
             .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setContentIntent(createLaunchPendingIntent(context))
             .setAutoCancel(true)
             .build()
         context.getSystemService(NotificationManager::class.java)

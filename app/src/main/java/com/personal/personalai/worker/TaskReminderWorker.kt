@@ -1,9 +1,12 @@
 package com.personal.personalai.worker
 
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import com.personal.personalai.MainActivity
 import androidx.hilt.work.HiltWorker
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
@@ -134,12 +137,23 @@ class TaskReminderWorker @AssistedInject constructor(
 
     // ── Notification helpers ─────────────────────────────────────────────────
 
+    private fun createLaunchPendingIntent(): PendingIntent {
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        return PendingIntent.getActivity(
+            context, 0, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+    }
+
     private fun showSimpleNotification(title: String, description: String) {
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle(title)
             .setContentText(description.ifEmpty { "Your scheduled AI reminder" })
             .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setContentIntent(createLaunchPendingIntent())
             .setAutoCancel(true)
             .build()
         notify(notification)
@@ -152,6 +166,7 @@ class TaskReminderWorker @AssistedInject constructor(
             .setContentText(aiResponse.take(100))
             .setStyle(NotificationCompat.BigTextStyle().bigText(aiResponse))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setContentIntent(createLaunchPendingIntent())
             .setAutoCancel(true)
             .build()
         notify(notification)
@@ -163,6 +178,7 @@ class TaskReminderWorker @AssistedInject constructor(
             .setContentTitle(title)
             .setContentText("AI task failed to run")
             .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setContentIntent(createLaunchPendingIntent())
             .setAutoCancel(true)
             .build()
         notify(notification)

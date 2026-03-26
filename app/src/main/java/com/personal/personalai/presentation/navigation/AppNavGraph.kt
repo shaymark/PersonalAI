@@ -61,6 +61,9 @@ fun AppNavGraph() {
                         },
                         selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true,
                         onClick = {
+                            if (currentDestination?.route == Screen.Settings.route) {
+                                navController.popBackStack()
+                            }
                             navController.navigate(screen.route) {
                                 popUpTo(navController.graph.findStartDestination().id) {
                                     saveState = true
