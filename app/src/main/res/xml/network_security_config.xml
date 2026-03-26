@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Block plain HTTP to all destinations by default.
+         HTTP to LAN/private-IP servers (e.g. Ollama) is permitted at the
+         OkHttp level via CleartextNetworkPolicy (private-IP override). -->
+    <base-config cleartextTrafficPermitted="false" />
+</network-security-config>

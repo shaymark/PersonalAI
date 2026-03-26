@@ -5,6 +5,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
+import com.personal.personalai.data.network.CleartextNetworkPolicy
 import com.personal.personalai.worker.TaskReminderWorker
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
@@ -22,6 +23,7 @@ class PersonalAIApplication : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
+        CleartextNetworkPolicy.installPrivateNetworkOverride()
         createNotificationChannel()
     }
 
