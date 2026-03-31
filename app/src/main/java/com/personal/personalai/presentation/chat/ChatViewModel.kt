@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.personal.personalai.R
 import com.personal.personalai.domain.audio.AudioRecorder
+import com.personal.personalai.domain.tools.PermissionBroker
 import com.personal.personalai.domain.tools.UserInputBroker
 import com.personal.personalai.domain.usecase.AgentLoopUseCase
 import com.personal.personalai.domain.usecase.AgentStep
@@ -27,6 +28,7 @@ class ChatViewModel @Inject constructor(
     private val transcribeAudioUseCase: TranscribeAudioUseCase,
     private val audioRecorder: AudioRecorder,
     private val userInputBroker: UserInputBroker,
+    private val permissionBroker: PermissionBroker,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -36,6 +38,7 @@ class ChatViewModel @Inject constructor(
     init {
         observeMessages()
         observeUserInputRequests()
+        observePermissionRequests()
     }
 
     private fun observeMessages() {
@@ -58,6 +61,21 @@ class ChatViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    /** Listens for permission requests from the agent loop and surfaces them in the UI. */
+    private fun observePermissionRequests() {
+        viewModelScope.launch {
+            permissionBroker.incoming.collect { request ->
+                _uiState.update { it.copy(pendingPermissionRequest = request) }
+            }
+        }
+    }
+
+    /** Called by ChatScreen with the system dialog result (true = granted, false = denied). */
+    fun resolvePermission(requestId: String, granted: Boolean) {
+        _uiState.update { it.copy(pendingPermissionRequest = null) }
+        permissionBroker.resolve(requestId, granted)
     }
 
     fun onInputChanged(text: String) {

@@ -7,7 +7,9 @@ import com.personal.personalai.domain.repository.ChatRepository
 import com.personal.personalai.domain.repository.MemoryRepository
 import com.personal.personalai.domain.tools.AgentResponse
 import com.personal.personalai.domain.tools.FunctionCall
+import com.personal.personalai.domain.tools.PermissionBroker
 import com.personal.personalai.domain.tools.ToolRegistry
+import com.personal.personalai.domain.tools.ToolResult
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
@@ -37,7 +39,8 @@ class AgentLoopUseCase @Inject constructor(
     private val aiRepository: AiRepository,
     private val chatRepository: ChatRepository,
     private val memoryRepository: MemoryRepository,
-    private val toolRegistry: ToolRegistry
+    private val toolRegistry: ToolRegistry,
+    private val permissionBroker: PermissionBroker
 ) {
     operator fun invoke(
         message: String,
@@ -95,7 +98,27 @@ class AgentLoopUseCase @Inject constructor(
                         })
 
                         // Execute the tool
-                        val toolResult = toolRegistry.execute(call.name, call.arguments)
+                        val rawResult = toolRegistry.execute(call.name, call.arguments)
+
+                        // If the tool requires a permission that hasn't been granted, request it
+                        val toolResult = if (rawResult is ToolResult.PermissionDenied) {
+                            if (backgroundMode) {
+                                // No UI available in background — fail descriptively
+                                ToolResult.Error(
+                                    "Permission '${rawResult.permission}' not granted. Open the app to grant it."
+                                )
+                            } else {
+                                val granted = permissionBroker.requestAndAwait(rawResult.permission)
+                                if (granted) {
+                                    toolRegistry.execute(call.name, call.arguments)
+                                } else {
+                                    ToolResult.Error(
+                                        "User denied permission '${rawResult.permission}'. " +
+                                        "Tell the user they can grant it in Settings > Apps > PersonalAI > Permissions."
+                                    )
+                                }
+                            }
+                        } else rawResult
 
                         // Append the function_call_output item
                         conversationItems.put(JSONObject().apply {

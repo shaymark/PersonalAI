@@ -1,6 +1,7 @@
 package com.personal.personalai.presentation.chat
 
 import com.personal.personalai.domain.model.Message
+import com.personal.personalai.domain.tools.PermissionBroker
 import com.personal.personalai.domain.tools.UserInputBroker
 
 /** Three mutually-exclusive voice-input states. Using a single enum prevents
@@ -15,5 +16,7 @@ data class ChatUiState(
     val voiceState: VoiceState = VoiceState.IDLE,
     val agentStatusMessage: String? = null,
     /** Non-null when the agent loop is paused waiting for the user to answer a question. */
-    val pendingInputRequest: UserInputBroker.Request? = null
+    val pendingInputRequest: UserInputBroker.Request? = null,
+    /** Non-null when the agent loop is paused waiting for the user to grant a permission. */
+    val pendingPermissionRequest: PermissionBroker.Request? = null
 )

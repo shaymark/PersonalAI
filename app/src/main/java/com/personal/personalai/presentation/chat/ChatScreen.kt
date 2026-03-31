@@ -1,9 +1,14 @@
 package com.personal.personalai.presentation.chat
 
 import android.Manifest
+import android.app.Activity
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.app.ActivityCompat
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -92,6 +97,8 @@ fun ChatScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
 
+    val activity = context as? Activity
+
     // Runtime permission launcher — routes denial through ViewModel so the error
     // surfaces via uiState.error and is shown by the LaunchedEffect below.
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -99,6 +106,81 @@ fun ChatScreen(
     ) { isGranted ->
         if (!isGranted) viewModel.onMicPermissionDenied()
         // If granted: user presses the mic again — standard Android convention
+    }
+
+    // Single-permission launcher for agent-requested permissions (SMS, Contacts, Notifications, etc.)
+    val agentPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        uiState.pendingPermissionRequest?.let { req ->
+            if (!granted && activity != null &&
+                !ActivityCompat.shouldShowRequestPermissionRationale(activity, req.permission)
+            ) {
+                // shouldShowRationale is false after denial → "Don't ask again" was checked.
+                // Open Settings so the user can manually grant it.
+                context.startActivity(
+                    Intent(
+                        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        Uri.fromParts("package", context.packageName, null)
+                    )
+                )
+            }
+            viewModel.resolvePermission(req.id, granted)
+        }
+    }
+
+    // Multi-permission launcher used for fine+coarse location together.
+    val agentMultiPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { results ->
+        uiState.pendingPermissionRequest?.let { req ->
+            val granted = results[req.permission] == true
+            if (!granted && activity != null &&
+                !ActivityCompat.shouldShowRequestPermissionRationale(activity, req.permission)
+            ) {
+                context.startActivity(
+                    Intent(
+                        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        Uri.fromParts("package", context.packageName, null)
+                    )
+                )
+            }
+            viewModel.resolvePermission(req.id, granted)
+        }
+    }
+
+    // Fire the appropriate launcher when the agent loop requests a permission.
+    val pendingPerm = uiState.pendingPermissionRequest
+    LaunchedEffect(pendingPerm?.id) {
+        val req = pendingPerm ?: return@LaunchedEffect
+        when (req.permission) {
+            Manifest.permission.ACCESS_BACKGROUND_LOCATION -> {
+                if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
+                    != PackageManager.PERMISSION_GRANTED
+                ) {
+                    // Request fine+coarse first; the agent will retry and hit the Settings path next
+                    agentMultiPermissionLauncher.launch(
+                        arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
+                    )
+                } else {
+                    // Fine already granted — Android requires Settings for background location
+                    context.startActivity(
+                        Intent(
+                            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                            Uri.fromParts("package", context.packageName, null)
+                        )
+                    )
+                    viewModel.resolvePermission(req.id, false)
+                }
+            }
+            Manifest.permission.ACCESS_FINE_LOCATION -> {
+                // Request fine and coarse together for better UX (single dialog)
+                agentMultiPermissionLauncher.launch(
+                    arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
+                )
+            }
+            else -> agentPermissionLauncher.launch(req.permission)
+        }
     }
 
     var initialScrollDone by remember { mutableStateOf(false) }
@@ -176,6 +258,30 @@ fun ChatScreen(
                     )
                 }
 
+                // Permission rationale card shown while the system dialog is displayed
+                uiState.pendingPermissionRequest?.let { req ->
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.tertiaryContainer,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 4.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text("🔐", style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                text = PermissionRationale.get(req.permission),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer
+                            )
+                        }
+                    }
+                }
+
                 // Question card shown when the agent is waiting for the user's answer
                 uiState.pendingInputRequest?.let { request ->
                     Surface(
@@ -216,8 +322,9 @@ fun ChatScreen(
                     },
                     onRecordRelease = viewModel::onRecordStop,
                     onRecordCancel = viewModel::onRecordCancel,
-                    // Allow input while agent waits for an answer
-                    isLoading = uiState.isLoading && uiState.pendingInputRequest == null,
+                    // Allow input while agent waits for an answer; lock during permission requests
+                    isLoading = uiState.isLoading && uiState.pendingInputRequest == null
+                        && uiState.pendingPermissionRequest == null,
                     modifier = Modifier.fillMaxWidth()
                 )
             }

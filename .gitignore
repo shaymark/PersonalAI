@@ -27,3 +27,6 @@ google-services.json
 
 # Screenshots (generated artifact, not source)
 screenshots/
+
+# Release APKs / AABs
+app/release/
