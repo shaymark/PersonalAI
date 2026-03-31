@@ -15,10 +15,6 @@
 |------|----------------|---------|
 | ![Chat welcome](screenshots/screen_01_chat_welcome.png) | ![Schedule empty](screenshots/screen_02_schedule_empty.png) | ![Settings](screenshots/screen_04_settings.png) |
 
-| Chat Conversation |
-|-------------------|
-| ![Chat conversation](screenshots/screen_03_chat_conversation.png) |
-
 ---
 
 ## Features
