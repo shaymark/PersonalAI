@@ -10,6 +10,7 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.unit.dp
 import com.personal.personalai.domain.model.Message
 import com.personal.personalai.domain.model.MessageRole
+import com.personal.personalai.domain.usecase.AgentLoopUseCase
 import com.personal.personalai.domain.usecase.GetChatHistoryUseCase
 import com.personal.personalai.presentation.chat.ChatScreen
 import com.personal.personalai.presentation.chat.ChatViewModel
@@ -33,7 +34,7 @@ class ChatScreenTest {
     @get:Rule(order = 1)
     val composeRule = createComposeRule()
 
-    private val sendMessageUseCase = mockk<SendMessageUseCase>(relaxed = true)
+    private val agentLoopUseCase = mockk<AgentLoopUseCase>(relaxed = true)
     private val getChatHistoryUseCase = mockk<GetChatHistoryUseCase>()
 
     @Before
@@ -44,7 +45,7 @@ class ChatScreenTest {
 
     @Test
     fun chatScreen_showsWelcomeMessage_whenEmpty() {
-        val viewModel = ChatViewModel(sendMessageUseCase, getChatHistoryUseCase, mockk(), mockk())
+        val viewModel = ChatViewModel(agentLoopUseCase, getChatHistoryUseCase, mockk(), mockk(), mockk(), mockk())
         composeRule.setContent {
             PersonalAITheme {
                 ChatScreen(
@@ -60,7 +61,7 @@ class ChatScreenTest {
 
     @Test
     fun chatScreen_showsSettingsButton() {
-        val viewModel = ChatViewModel(sendMessageUseCase, getChatHistoryUseCase, mockk(),mockk())
+        val viewModel = ChatViewModel(agentLoopUseCase, getChatHistoryUseCase, mockk(),mockk(), mockk(), mockk())
         composeRule.setContent {
             PersonalAITheme {
                 ChatScreen(
@@ -81,7 +82,7 @@ class ChatScreenTest {
             Message(id = 2, content = "Hi! How can I help?", role = MessageRole.ASSISTANT)
         )
         every { getChatHistoryUseCase() } returns flowOf(messages)
-        val viewModel = ChatViewModel(sendMessageUseCase, getChatHistoryUseCase, mockk(), mockk())
+        val viewModel = ChatViewModel(agentLoopUseCase, getChatHistoryUseCase, mockk(), mockk(), mockk(), mockk())
 
         composeRule.setContent {
             PersonalAITheme {
@@ -99,7 +100,7 @@ class ChatScreenTest {
 
     @Test
     fun chatScreen_micAndSendButtonsPresent() {
-        val viewModel = ChatViewModel(sendMessageUseCase, getChatHistoryUseCase, mockk(), mockk())
+        val viewModel = ChatViewModel(agentLoopUseCase, getChatHistoryUseCase, mockk(), mockk(), mockk(), mockk())
         composeRule.setContent {
             PersonalAITheme {
                 ChatScreen(
@@ -117,7 +118,7 @@ class ChatScreenTest {
     @Test
     fun chatScreen_navigatesToSettings_onSettingsClick() {
         var navigated = false
-        val viewModel = ChatViewModel(sendMessageUseCase, getChatHistoryUseCase, mockk(), mockk())
+        val viewModel = ChatViewModel(agentLoopUseCase, getChatHistoryUseCase, mockk(), mockk(), mockk(), mockk())
         composeRule.setContent {
             PersonalAITheme {
                 ChatScreen(

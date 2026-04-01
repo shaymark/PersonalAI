@@ -28,14 +28,6 @@
     <string name="cancel">ביטול</string>
     <string name="ok">אישור</string>
 
-    <!-- Local LLM settings -->
-    <string name="ai_provider_openai">OpenAI (ענן)</string>
-    <string name="ai_provider_local">מודל מקומי</string>
-    <string name="local_llm_note">פועל לחלוטין על המכשיר — ללא אינטרנט או מפתח API.\nתזכורות ותגיות זיכרון עדיין פועלים דרך הוראות טקסט.</string>
-    <string name="hf_token_section_title">טוקן גישה ל-HuggingFace</string>
-    <string name="hf_token_note">נדרש להורדת מודלי Gemma מוגנים. אשר/י את הרישיון של Gemma ב-HuggingFace, ולאחר מכן צור/י טוקן קריאה בכתובת huggingface.co/settings/tokens.</string>
-    <string name="hf_token_label">טוקן HuggingFace (hf_…)</string>
-    <string name="hf_token_saved">נשמר ✓</string>
 
     <!-- Ollama Dev Mode settings -->
     <string name="ai_provider_ollama">פיתוח (Ollama)</string>
@@ -43,14 +35,6 @@
     <string name="ollama_url_label">כתובת שרת</string>
     <string name="ollama_model_label">תגית מודל</string>
     <string name="ollama_saved">נשמר ✓</string>
-
-    <string name="local_models_title">מודלים זמינים</string>
-    <string name="download">הורד</string>
-    <string name="downloading">מוריד…</string>
-    <string name="downloading_model">מוריד %1$s</string>
-    <string name="select_model">בחר</string>
-    <string name="model_selected">נבחר</string>
-    <string name="download_failed_title">ההורדה נכשלה</string>
 
     <!-- Web Search settings -->
     <string name="web_search_title">חיפוש באינטרנט</string>
