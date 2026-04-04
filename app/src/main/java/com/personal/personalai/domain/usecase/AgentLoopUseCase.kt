@@ -1,5 +1,7 @@
 package com.personal.personalai.domain.usecase
 
+import android.os.SystemClock
+import android.util.Log
 import com.personal.personalai.domain.model.Message
 import com.personal.personalai.domain.model.MessageRole
 import com.personal.personalai.domain.repository.AiRepository
@@ -10,9 +12,11 @@ import com.personal.personalai.domain.tools.FunctionCall
 import com.personal.personalai.domain.tools.PermissionBroker
 import com.personal.personalai.domain.tools.ToolRegistry
 import com.personal.personalai.domain.tools.ToolResult
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import org.json.JSONArray
 import org.json.JSONObject
 import javax.inject.Inject
@@ -25,6 +29,7 @@ sealed class AgentStep {
 }
 
 private const val MAX_ITERATIONS = 8
+private const val TAG = "AgentLoopUseCase"
 
 /**
  * Orchestrates the multi-turn agent loop:
@@ -46,6 +51,7 @@ class AgentLoopUseCase @Inject constructor(
         message: String,
         backgroundMode: Boolean = false
     ): Flow<AgentStep> = flow {
+        val loopStartMs = SystemClock.elapsedRealtime()
         // 1. Save user message to chat (foreground only)
         if (!backgroundMode) {
             chatRepository.saveMessage(Message(content = message, role = MessageRole.USER))
@@ -78,11 +84,22 @@ class AgentLoopUseCase @Inject constructor(
 
         // 4. Agent loop
         repeat(MAX_ITERATIONS) { iteration ->
+            val llmStartMs = SystemClock.elapsedRealtime()
             val response = aiRepository.sendMessageWithTools(conversationItems, memories, tools)
                 .getOrElse { e ->
+                    Log.e(
+                        TAG,
+                        "iteration=${iteration + 1} llmFailed after ${SystemClock.elapsedRealtime() - llmStartMs}ms: ${e.message}",
+                        e
+                    )
                     emit(AgentStep.Complete(Result.failure(e)))
                     return@flow
                 }
+            Log.d(
+                TAG,
+                "iteration=${iteration + 1} llmMs=${SystemClock.elapsedRealtime() - llmStartMs} " +
+                    "response=${response::class.simpleName}"
+            )
 
             when (response) {
                 is AgentResponse.ToolCalls -> {
@@ -98,7 +115,13 @@ class AgentLoopUseCase @Inject constructor(
                         })
 
                         // Execute the tool
+                        val toolStartMs = SystemClock.elapsedRealtime()
                         val rawResult = toolRegistry.execute(call.name, call.arguments)
+                        Log.d(
+                            TAG,
+                            "iteration=${iteration + 1} tool=${call.name} rawToolMs=${SystemClock.elapsedRealtime() - toolStartMs} " +
+                                "result=${rawResult::class.simpleName}"
+                        )
 
                         // If the tool requires a permission that hasn't been granted, request it
                         val toolResult = if (rawResult is ToolResult.PermissionDenied) {
@@ -137,6 +160,11 @@ class AgentLoopUseCase @Inject constructor(
                             Message(content = response.text, role = MessageRole.ASSISTANT)
                         )
                     }
+                    Log.d(
+                        TAG,
+                        "completed totalMs=${SystemClock.elapsedRealtime() - loopStartMs} " +
+                            "iterations=${iteration + 1} responseChars=${response.text.length}"
+                    )
                     emit(AgentStep.Complete(Result.success(response.text)))
                     return@flow
                 }
@@ -145,7 +173,7 @@ class AgentLoopUseCase @Inject constructor(
 
         // Exceeded max iterations without a text response
         emit(AgentStep.Complete(Result.failure(Exception("Agent loop exceeded $MAX_ITERATIONS iterations"))))
-    }
+    }.flowOn(Dispatchers.IO)
 
     private fun humanReadable(toolName: String, arguments: String): String {
         val args = runCatching { JSONObject(arguments) }.getOrDefault(JSONObject())

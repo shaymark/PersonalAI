@@ -2,20 +2,28 @@ package com.personal.personalai.localllm.engine
 
 import android.content.Context
 import android.os.Build
+import android.os.SystemClock
+import android.util.Log
 import com.google.ai.edge.litertlm.Backend
 import com.google.ai.edge.litertlm.Content
 import com.google.ai.edge.litertlm.Contents
 import com.google.ai.edge.litertlm.ConversationConfig
 import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.EngineConfig
+import com.google.ai.edge.litertlm.ExperimentalApi
+import com.google.ai.edge.litertlm.ExperimentalFlags
 import com.google.ai.edge.litertlm.Message
 import com.google.ai.edge.litertlm.SamplerConfig
+import com.google.ai.edge.litertlm.ToolCall
 import com.personal.personalai.localllm.api.LocalLlmMessage
 import com.personal.personalai.localllm.api.LocalLlmResponse
+import com.personal.personalai.localllm.api.LocalLlmTool
+import com.personal.personalai.localllm.api.LocalLlmToolCallMessage
 import com.personal.personalai.localllm.api.LocalToolCall
 import kotlinx.coroutines.flow.toList
 import org.json.JSONArray
 import org.json.JSONObject
+import org.json.JSONTokener
 import java.util.UUID
 
 /**
@@ -24,15 +32,14 @@ import java.util.UUID
  * - GPU backend is preferred; falls back to CPU if unavailable.
  * - Requires Android 12 (API 31); [isSupported] must be checked before calling [generate].
  * - The [Engine] is created lazily and cached by model path.
- * - **Tool calling** uses system-prompt injection + JSON output parsing. LiteRT-LM's native
- *   `automaticToolCalling` is disabled because its parser cannot handle Gemma 4's
- *   `<|tool_call>` output format. Instead, [LocalLlmDataSource] injects tool schemas into
- *   the system message and [generate] parses `{"tool_calls":[...]}` from the model output,
- *   returning [LocalLlmResponse.ToolCalls] when a tool call is detected.
+ * - **Tool calling** uses LiteRT-LM's native tool-provider interface with automatic execution
+ *   disabled, so the app can still own permissions, `ask_user`, and other side effects.
+ *   A text-parser fallback is kept as a safety net for model/library mismatches.
  */
 class LiteRtLlmEngine(private val context: Context) {
 
     companion object {
+        private const val TAG = "LiteRtLlmEngine"
         /** Minimum Android API level required by LiteRT-LM GPU backend. */
         const val MIN_API_LEVEL = Build.VERSION_CODES.S  // API 31 = Android 12
 
@@ -42,11 +49,19 @@ class LiteRtLlmEngine(private val context: Context) {
         // 8192 gives ~4× more context than the default 4096 while staying within Gemma 4's
         // supported range (up to 32K). Increase further only if your device has enough RAM.
         private const val MAX_TOKENS  = 16256
+        // Keep CPU fallback from monopolizing all cores and starving the UI thread.
+        private val CPU_FALLBACK_THREADS =
+            (Runtime.getRuntime().availableProcessors() / 2).coerceIn(2, 4)
     }
 
     private var currentModelPath: String? = null
+    private var currentBackendLabel: String? = null
     private var engine: Engine? = null
     private var currentConversation: com.google.ai.edge.litertlm.Conversation? = null
+    private var currentConversationMessages: List<LocalLlmMessage> = emptyList()
+    private var currentVisibleConversationMessages: List<LocalLlmMessage> = emptyList()
+    private var currentSystemReuseKey: String? = null
+    private var currentToolsSignature: String? = null
 
     /** Returns true if this device meets the minimum OS requirement for LiteRT-LM. */
     fun isSupported(): Boolean = Build.VERSION.SDK_INT >= MIN_API_LEVEL
@@ -54,19 +69,22 @@ class LiteRtLlmEngine(private val context: Context) {
     /**
      * Generates a response for the [messages] conversation.
      *
-     * Tool schemas are expected to be injected into the system message by the caller
-     * ([LocalLlmDataSource]). When the model outputs a JSON tool call, [generate] returns
-     * [LocalLlmResponse.ToolCalls]; otherwise [LocalLlmResponse.Text].
+     * Tool schemas are passed separately in [tools]. When the model returns a structured
+     * tool call, [generate] returns [LocalLlmResponse.ToolCalls]; otherwise it returns
+     * [LocalLlmResponse.Text].
      *
      * Tokens are streamed to [onToken] as they arrive.
      *
-     * @param messages Full conversation: first message is SYSTEM (prompt + tool schemas +
-     *   memories), then alternating USER/ASSISTANT history, last message is the current USER turn.
+     * @param messages Full conversation: first message is SYSTEM (prompt + memories), then
+     *   alternating USER / ASSISTANT / TOOL history, with the final USER turn sent live.
+     * @param tools Tool definitions exposed to LiteRT-LM's tool manager.
      * @param modelPath Absolute path to the downloaded `.litertlm` model file.
      * @param onToken Optional per-token streaming callback.
      */
+    @OptIn(ExperimentalApi::class)
     suspend fun generate(
         messages: List<LocalLlmMessage>,
+        tools: List<LocalLlmTool>,
         modelPath: String,
         onToken: (String) -> Unit = {}
     ): LocalLlmResponse {
@@ -77,49 +95,165 @@ class LiteRtLlmEngine(private val context: Context) {
             )
         }
         return try {
+            val generationStartMs = SystemClock.elapsedRealtime()
             ensureEngine(modelPath)
             val eng = engine ?: return LocalLlmResponse.Error("Failed to load model.")
 
-            val systemContents  = buildSystemContents(messages)
-            val historyMessages = buildHistoryMessages(messages)
-            val userText        = extractLatestUserMessage(messages)
+            val systemContents = buildSystemContents(messages)
+            val nonSystemMessages = messages.filter { it.role != LocalLlmMessage.Role.SYSTEM }
+            val systemReuseKey = buildSystemReuseKey(messages)
+            val toolsSignature = buildToolsSignature(tools)
+            val toolProviders   = buildToolProviders(tools) { name, _ ->
+                JSONObject()
+                    .put("error", "Automatic tool execution is disabled for $name")
+                    .toString()
+            }
 
-            // LiteRT-LM only supports one active session at a time — close the previous
-            // conversation before creating a new one.
-            closeCurrentConversation()
+            val rawPrefixMatch =
+                currentConversation != null &&
+                    currentSystemReuseKey == systemReuseKey &&
+                    currentToolsSignature == toolsSignature &&
+                    hasMessagePrefix(
+                        messages = nonSystemMessages,
+                        prefix = currentConversationMessages
+                    )
+            val visiblePrefixMatch =
+                !rawPrefixMatch &&
+                    currentConversation != null &&
+                    currentSystemReuseKey == systemReuseKey &&
+                    currentToolsSignature == toolsSignature &&
+                    hasMessagePrefix(
+                        messages = nonSystemMessages,
+                        prefix = currentVisibleConversationMessages
+                    )
+            val reusableConversation = rawPrefixMatch || visiblePrefixMatch
 
-            val config = ConversationConfig(
-                systemInstruction    = systemContents,
-                initialMessages      = historyMessages,
-                tools                = emptyList(),
-                samplerConfig        = SamplerConfig(topK = TOP_K, topP = TOP_P, temperature = TEMPERATURE),
-                automaticToolCalling = false
+            val initialPlan = if (reusableConversation) null else planInitialConversation(messages)
+
+            var conversationMs = 0L
+            val conversation = if (reusableConversation) {
+                currentConversation!!
+                    .also {
+                        Log.d(
+                            TAG,
+                            "Reusing LiteRT conversation backend=${currentBackendLabel ?: "unknown"} " +
+                                "mode=${if (rawPrefixMatch) "raw" else "visible"} " +
+                                "knownMessages=${currentConversationMessages.size} " +
+                                "visibleMessages=${currentVisibleConversationMessages.size} " +
+                                "incomingMessages=${nonSystemMessages.size}"
+                        )
+                    }
+            } else {
+                closeCurrentConversation()
+                val config = ConversationConfig(
+                    systemInstruction = systemContents,
+                    initialMessages = buildHistoryMessages(initialPlan!!.historyMessages),
+                    tools = toolProviders,
+                    samplerConfig = SamplerConfig(topK = TOP_K, topP = TOP_P, temperature = TEMPERATURE),
+                    automaticToolCalling = false
+                )
+
+                val conversationStartMs = SystemClock.elapsedRealtime()
+                ExperimentalFlags.enableConversationConstrainedDecoding = true
+                val createdConversation = try {
+                    eng.createConversation(config)
+                } finally {
+                    ExperimentalFlags.enableConversationConstrainedDecoding = false
+                }
+                currentConversation = createdConversation
+                currentConversationMessages = initialPlan.historyMessages
+                currentVisibleConversationMessages =
+                    projectVisibleMessages(initialPlan.historyMessages)
+                currentSystemReuseKey = systemReuseKey
+                currentToolsSignature = toolsSignature
+                conversationMs = SystemClock.elapsedRealtime() - conversationStartMs
+                createdConversation
+            }
+
+            val newLocalMessages = if (reusableConversation) {
+                nonSystemMessages.drop(
+                    if (rawPrefixMatch) {
+                        currentConversationMessages.size
+                    } else {
+                        currentVisibleConversationMessages.size
+                    }
+                )
+            } else {
+                initialPlan!!.liveMessages
+            }
+            val outboundMessages = buildOutboundMessages(newLocalMessages)
+            if (outboundMessages.isEmpty()) {
+                return LocalLlmResponse.Error("No new message to send to the local conversation.")
+            }
+
+            val assembled = StringBuilder()
+            val nativeToolCalls = mutableListOf<LocalToolCall>()
+            val inferenceStartMs = SystemClock.elapsedRealtime()
+            outboundMessages.forEachIndexed { index, outboundMessage ->
+                conversation.sendMessageAsync(outboundMessage)
+                    .toList()
+                    .forEach { msg ->
+                        if (msg.toolCalls.isNotEmpty()) {
+                            nativeToolCalls += msg.toolCalls.map { call ->
+                                LocalToolCall(
+                                    callId = UUID.randomUUID().toString(),
+                                    name = call.name,
+                                    argumentsJson = JSONObject(call.arguments).toString()
+                                )
+                            }
+                        }
+
+                        val text = msg.contents
+                            .contents
+                            .filterIsInstance<Content.Text>()
+                            .joinToString("") { it.text }
+                        if (index == outboundMessages.lastIndex) {
+                            onToken(text)
+                            assembled.append(text)
+                        }
+                    }
+            }
+            currentConversationMessages = currentConversationMessages + newLocalMessages
+            currentVisibleConversationMessages =
+                currentVisibleConversationMessages + projectVisibleMessages(newLocalMessages)
+            val inferenceMs = SystemClock.elapsedRealtime() - inferenceStartMs
+            val totalMs = SystemClock.elapsedRealtime() - generationStartMs
+            Log.d(
+                TAG,
+                "generate backend=${currentBackendLabel ?: "unknown"} " +
+                    "conversationMs=$conversationMs inferenceMs=$inferenceMs totalMs=$totalMs " +
+                    "history=${currentConversationMessages.size} tools=${tools.size} " +
+                    "toolCalls=${nativeToolCalls.size} chars=${assembled.length}"
             )
 
-            val conversation = eng.createConversation(config)
-            currentConversation = conversation
-
-            // Flow-based streaming: collect all Message tokens, assemble the final text
-            val assembled = StringBuilder()
-            conversation.sendMessageAsync(userText)
-                .toList()
-                .forEach { msg ->
-                    val text = msg.contents?.let { c ->
-                        c.contents.filterIsInstance<Content.Text>()
-                            .joinToString("") { it.text }
-                    }.orEmpty()
-                    onToken(text)
-                    assembled.append(text)
-                }
-
-            val fullText = assembled.toString().trim()
-            val toolCalls = parseToolCalls(fullText)
-            if (toolCalls != null) {
-                LocalLlmResponse.ToolCalls(toolCalls)
+            if (nativeToolCalls.isNotEmpty()) {
+                currentConversationMessages =
+                    currentConversationMessages +
+                        buildAssistantToolCallMessages(nativeToolCalls)
+                LocalLlmResponse.ToolCalls(nativeToolCalls)
             } else {
-                LocalLlmResponse.Text(fullText)
+                val fullText = assembled.toString().trim()
+                val toolCalls = parseToolCalls(fullText)
+                if (toolCalls != null) {
+                    currentConversationMessages =
+                        currentConversationMessages +
+                            buildAssistantToolCallMessages(toolCalls)
+                    LocalLlmResponse.ToolCalls(toolCalls)
+                } else {
+                    val assistantMessage = LocalLlmMessage(
+                        role = LocalLlmMessage.Role.ASSISTANT,
+                        content = fullText
+                    )
+                    currentConversationMessages =
+                        currentConversationMessages + assistantMessage
+                    currentVisibleConversationMessages =
+                        currentVisibleConversationMessages + assistantMessage
+                    LocalLlmResponse.Text(fullText)
+                }
             }
         } catch (e: Exception) {
+            Log.e(TAG, "Local generation failed: ${e.message}", e)
+            closeCurrentConversation()
             LocalLlmResponse.Error(e.message ?: "Unknown inference error")
         }
     }
@@ -129,6 +263,10 @@ class LiteRtLlmEngine(private val context: Context) {
     private fun closeCurrentConversation() {
         currentConversation?.close()
         currentConversation = null
+        currentConversationMessages = emptyList()
+        currentVisibleConversationMessages = emptyList()
+        currentSystemReuseKey = null
+        currentToolsSignature = null
     }
 
     /** Releases the conversation and the native engine. Call when switching away from Local. */
@@ -149,16 +287,50 @@ class LiteRtLlmEngine(private val context: Context) {
         engine?.close()
         engine = null
         currentModelPath = null
+        currentBackendLabel = null
 
         val cacheDir = context.cacheDir.absolutePath
 
         val newEngine = try {
-            Engine(EngineConfig(modelPath = modelPath, backend = Backend.GPU(), maxNumTokens = MAX_TOKENS, cacheDir = cacheDir))
-        } catch (_: Exception) {
+            val createStartMs = SystemClock.elapsedRealtime()
+            Engine(
+                EngineConfig(
+                    modelPath = modelPath,
+                    backend = Backend.GPU(),
+                    maxNumTokens = MAX_TOKENS,
+                    cacheDir = cacheDir
+                )
+            ).also {
+                currentBackendLabel = "GPU"
+                Log.d(TAG, "Created LiteRT engine with GPU backend in ${SystemClock.elapsedRealtime() - createStartMs}ms")
+            }
+        } catch (gpuError: Exception) {
             // GPU not available — fall back to CPU
-            Engine(EngineConfig(modelPath = modelPath, backend = Backend.CPU(), maxNumTokens = MAX_TOKENS, cacheDir = cacheDir))
+            val createStartMs = SystemClock.elapsedRealtime()
+            Engine(
+                EngineConfig(
+                    modelPath = modelPath,
+                    backend = Backend.CPU(numOfThreads = CPU_FALLBACK_THREADS),
+                    maxNumTokens = MAX_TOKENS,
+                    cacheDir = cacheDir
+                )
+            ).also {
+                currentBackendLabel = "CPU($CPU_FALLBACK_THREADS)"
+                Log.w(
+                    TAG,
+                    "GPU backend unavailable, using CPU($CPU_FALLBACK_THREADS). " +
+                        "Reason: ${gpuError.message}. " +
+                        "CreateMs=${SystemClock.elapsedRealtime() - createStartMs}"
+                )
+            }
         }
+        val initStartMs = SystemClock.elapsedRealtime()
         newEngine.initialize()
+        Log.d(
+            TAG,
+            "Initialized LiteRT engine backend=${currentBackendLabel ?: "unknown"} " +
+                "initMs=${SystemClock.elapsedRealtime() - initStartMs}"
+        )
         engine = newEngine
         currentModelPath = modelPath
     }
@@ -326,9 +498,101 @@ class LiteRtLlmEngine(private val context: Context) {
 
     // ── Prompt helpers ────────────────────────────────────────────────────────
 
+    private data class ConversationPlan(
+        val historyMessages: List<LocalLlmMessage>,
+        val liveMessages: List<LocalLlmMessage>
+    )
+
+    private fun planInitialConversation(messages: List<LocalLlmMessage>): ConversationPlan {
+        val nonSystemMessages = messages.filter { it.role != LocalLlmMessage.Role.SYSTEM }
+        require(nonSystemMessages.isNotEmpty()) { "No conversation messages to send" }
+
+        val liveStart = when (nonSystemMessages.last().role) {
+            LocalLlmMessage.Role.TOOL ->
+                nonSystemMessages.indexOfLast { it.role != LocalLlmMessage.Role.TOOL } + 1
+            LocalLlmMessage.Role.USER ->
+                nonSystemMessages.lastIndex
+            else ->
+                error("The last local message must be a USER or TOOL message.")
+        }
+
+        return ConversationPlan(
+            historyMessages = nonSystemMessages.take(liveStart),
+            liveMessages = nonSystemMessages.drop(liveStart)
+        )
+    }
+
+    private fun buildOutboundMessages(messages: List<LocalLlmMessage>): List<Message> {
+        if (messages.isEmpty()) return emptyList()
+        return when (messages.first().role) {
+            LocalLlmMessage.Role.USER -> {
+                val user = messages.singleOrNull()
+                    ?: error("Expected a single USER message to send.")
+                listOf(Message.user(user.content))
+            }
+            LocalLlmMessage.Role.TOOL -> {
+                val responses = messages
+                    .takeWhile { it.role == LocalLlmMessage.Role.TOOL }
+                    .flatMap { toolMessage ->
+                        toolMessage.toolResponses.map { response ->
+                            Content.ToolResponse(
+                                name = response.name,
+                                response = jsonStringToKotlinValue(response.responseJson)
+                            )
+                        }
+                    }
+                if (responses.isEmpty()) emptyList() else listOf(Message.tool(Contents.of(responses)))
+            }
+            else -> error("Unsupported outbound message role: ${messages.first().role}")
+        }
+    }
+
+    private fun buildAssistantToolCallMessages(toolCalls: List<LocalToolCall>): List<LocalLlmMessage> =
+        toolCalls.map { call ->
+            LocalLlmMessage(
+                role = LocalLlmMessage.Role.ASSISTANT,
+                toolCalls = listOf(
+                    LocalLlmToolCallMessage(
+                        name = call.name,
+                        argumentsJson = call.argumentsJson
+                    )
+                )
+            )
+        }
+
+    private fun buildSystemReuseKey(messages: List<LocalLlmMessage>): String =
+        messages.firstOrNull { it.role == LocalLlmMessage.Role.SYSTEM }
+            ?.content
+            ?.replace(Regex("""Current date and time:\s+.*"""), "Current date and time: <dynamic>")
+            .orEmpty()
+
+    private fun buildToolsSignature(tools: List<LocalLlmTool>): String =
+        tools.joinToString("\n") { tool ->
+            "${tool.name}|${tool.description}|${tool.parametersSchemaJson}"
+        }
+
+    private fun hasMessagePrefix(
+        messages: List<LocalLlmMessage>,
+        prefix: List<LocalLlmMessage>
+    ): Boolean {
+        if (prefix.size > messages.size) return false
+        return prefix.indices.all { index -> messages[index] == prefix[index] }
+    }
+
+    private fun projectVisibleMessages(messages: List<LocalLlmMessage>): List<LocalLlmMessage> =
+        messages.mapNotNull { message ->
+            when {
+                message.role == LocalLlmMessage.Role.USER && message.content.isNotBlank() -> message
+                message.role == LocalLlmMessage.Role.ASSISTANT &&
+                    message.content.isNotBlank() &&
+                    message.toolCalls.isEmpty() -> message
+                else -> null
+            }
+        }
+
     /**
      * Builds a [Contents] object for the system instruction from the SYSTEM message
-     * in [messages] (which contains the tools system prompt + tool schemas + memories).
+     * in [messages].
      */
     private fun buildSystemContents(messages: List<LocalLlmMessage>): Contents {
         val systemText = messages.firstOrNull { it.role == LocalLlmMessage.Role.SYSTEM }?.content
@@ -337,28 +601,77 @@ class LiteRtLlmEngine(private val context: Context) {
     }
 
     /**
-     * Converts prior USER/ASSISTANT turns (all but the final user message) into
-     * [Message] objects for [ConversationConfig.initialMessages].
-     *
-     * History is capped at the last 20 messages to fit within the context window.
+     * Converts prior USER / ASSISTANT / TOOL turns into [Message] objects for
+     * [ConversationConfig.initialMessages]. History is capped at the last 20 messages to fit
+     * within the context window when a new conversation must be created.
      */
     private fun buildHistoryMessages(messages: List<LocalLlmMessage>): List<Message> {
-        val nonSystem = messages.filter { it.role != LocalLlmMessage.Role.SYSTEM }
-        // Drop the final user message — it is sent live via sendMessageAsync
-        val history = if (nonSystem.lastOrNull()?.role == LocalLlmMessage.Role.USER) {
-            nonSystem.dropLast(1)
-        } else nonSystem
-
-        return history.takeLast(20).map { msg ->
+        return messages.takeLast(20).mapNotNull { msg ->
             when (msg.role) {
-                LocalLlmMessage.Role.USER      -> Message.user(msg.content)
-                LocalLlmMessage.Role.ASSISTANT -> Message.model(Contents.of(msg.content))
-                LocalLlmMessage.Role.SYSTEM    -> Message.system(msg.content)
+                LocalLlmMessage.Role.USER ->
+                    Message.user(msg.content)
+
+                LocalLlmMessage.Role.ASSISTANT -> when {
+                    msg.toolCalls.isNotEmpty() -> Message.model(
+                        toolCalls = msg.toolCalls.map { toolCall ->
+                            ToolCall(
+                                name = toolCall.name,
+                                arguments = jsonObjectStringToMap(toolCall.argumentsJson)
+                            )
+                        }
+                    )
+                    msg.content.isNotBlank() -> Message.model(Contents.of(msg.content))
+                    else -> null
+                }
+
+                LocalLlmMessage.Role.TOOL -> {
+                    val responses = msg.toolResponses.map { response ->
+                        Content.ToolResponse(
+                            name = response.name,
+                            response = jsonStringToKotlinValue(response.responseJson)
+                        )
+                    }
+                    if (responses.isEmpty()) null else Message.tool(Contents.of(responses))
+                }
+
+                LocalLlmMessage.Role.SYSTEM -> null
             }
         }
     }
 
-    private fun extractLatestUserMessage(messages: List<LocalLlmMessage>): String =
-        messages.lastOrNull { it.role == LocalLlmMessage.Role.USER }?.content
-            ?: error("No user message in conversation")
+    private fun jsonObjectStringToMap(json: String): Map<String, Any?> =
+        runCatching {
+            val parsed = JSONTokener(json).nextValue()
+            if (parsed is JSONObject) {
+                when (val kotlinValue = jsonValueToKotlin(parsed)) {
+                    is Map<*, *> -> kotlinValue.entries.associate { (key, value) ->
+                        key.toString() to value
+                    }
+                    else -> emptyMap()
+                }
+            } else {
+                emptyMap()
+            }
+        }.getOrDefault(emptyMap())
+
+    private fun jsonStringToKotlinValue(json: String): Any? =
+        runCatching { jsonValueToKotlin(JSONTokener(json).nextValue()) }
+            .getOrDefault(json)
+
+    private fun jsonValueToKotlin(value: Any?): Any? = when (value) {
+        null, JSONObject.NULL -> null
+        is JSONObject -> buildMap {
+            val keys = value.keys()
+            while (keys.hasNext()) {
+                val key = keys.next()
+                put(key, jsonValueToKotlin(value.opt(key)))
+            }
+        }
+        is JSONArray -> buildList {
+            for (i in 0 until value.length()) {
+                add(jsonValueToKotlin(value.opt(i)))
+            }
+        }
+        else -> value
+    }
 }

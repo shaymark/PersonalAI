@@ -10,13 +10,19 @@ import com.personal.personalai.domain.tools.FunctionCall
 import com.personal.personalai.localllm.api.LocalLlmMessage
 import com.personal.personalai.localllm.api.LocalLlmResponse
 import com.personal.personalai.localllm.api.LocalModel
+import com.personal.personalai.localllm.api.LocalLlmTool
+import com.personal.personalai.localllm.api.LocalLlmToolCallMessage
+import com.personal.personalai.localllm.api.LocalLlmToolResponseMessage
 import com.personal.personalai.localllm.download.ModelDownloadManager
 import com.personal.personalai.localllm.engine.LiteRtLlmEngine
 import com.personal.personalai.presentation.settings.PreferencesKeys
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import org.json.JSONTokener
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import javax.inject.Inject
@@ -24,10 +30,9 @@ import javax.inject.Inject
 /**
  * Bridges `:app`'s domain types to the `:localllm` module for on-device inference.
  *
- * Tool calling uses system-prompt injection + JSON parsing: tool schemas are injected
- * into the system message and the engine parses `{"tool_calls":[...]}` from model output.
- * When tool calls are detected, [AgentResponse.ToolCalls] is returned so that
- * [AgentLoopUseCase] executes the tools and loops — the same path as OpenAI/Ollama.
+ * Tool calling uses LiteRT-LM's native tool-provider path, while preserving the app's
+ * existing agent loop so permissions, `ask_user`, and other side effects still stay in
+ * app-controlled code.
  */
 class LocalLlmDataSource @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -40,6 +45,7 @@ class LocalLlmDataSource @Inject constructor(
         private val SYSTEM_PROMPT_TEMPLATE = """
             You are a helpful personal AI assistant running directly on this Android device.
             You can answer questions and have natural conversations.
+            You are a model that can do function calling with the available tools.
 
             You have access to powerful tools that let you take real actions for the user.
             Always use tools when the user's intent matches a tool capability. After using a
@@ -50,23 +56,14 @@ class LocalLlmDataSource @Inject constructor(
             a confirmation), you MUST call the ask_user tool instead. Only use your text response
             for final answers and confirmations after all necessary information has been gathered.
             Asking a question in plain text is not allowed — always use ask_user.
-            {{TOOLS_SECTION}}
+
+            CRITICAL — Exact values: When a tool returns exact text fields such as `summary`,
+            `*_text`, `formatted_*`, phone numbers, coordinates, times, URLs, or other
+            digit-heavy values, copy those values exactly in your final answer. Do not
+            reformat them, do not insert extra punctuation, and do not spell them differently.
+            If both numeric and text versions are present, prefer the text version.
             {{MEMORIES_SECTION}}
             Current date and time: {{DATETIME}}
-        """.trimIndent()
-
-        private val TOOLS_SECTION_TEMPLATE = """
-
-            TOOLS
-            When you need to call a tool, output ONLY the following JSON — no other text, no markdown fences, nothing else:
-            {"tool_calls":[{"name":"<tool_name>","arguments":{"param1":"value1"}}]}
-
-            To call multiple tools at once:
-            {"tool_calls":[{"name":"tool1","arguments":{...}},{"name":"tool2","arguments":{...}}]}
-
-            Available tools:
-            [{{TOOL_SCHEMAS}}]
-
         """.trimIndent()
     }
 
@@ -74,9 +71,9 @@ class LocalLlmDataSource @Inject constructor(
         conversationItems: JSONArray,
         memories: List<Memory>,
         tools: List<AgentTool>
-    ): Result<AgentResponse> {
+    ): Result<AgentResponse> = withContext(Dispatchers.IO) {
         if (!engine.isSupported()) {
-            return Result.success(
+            return@withContext Result.success(
                 AgentResponse.Text(
                     "On-device AI requires Android 12 (API 31) or higher. " +
                     "Please use OpenAI or Ollama instead."
@@ -89,7 +86,7 @@ class LocalLlmDataSource @Inject constructor(
         val model = LocalModel.fromId(modelId) ?: LocalModel.GEMMA_4_E2B
 
         if (!ModelDownloadManager.isDownloaded(context, model)) {
-            return Result.success(
+            return@withContext Result.success(
                 AgentResponse.Text(
                     "Model \"${model.displayName}\" is not downloaded yet. " +
                     "Please go to Settings → Local AI and tap Download."
@@ -97,10 +94,17 @@ class LocalLlmDataSource @Inject constructor(
             )
         }
 
-        return try {
-            val messages = buildMessageList(conversationItems, memories, tools)
+        try {
+            val messages = buildMessageList(conversationItems, memories)
+            val localTools = tools.map { tool ->
+                LocalLlmTool(
+                    name = tool.name,
+                    description = tool.description,
+                    parametersSchemaJson = tool.parametersSchema().toString()
+                )
+            }
             val modelPath = ModelDownloadManager.modelFile(context, model).absolutePath
-            val response  = engine.generate(messages, modelPath)
+            val response  = engine.generate(messages, localTools, modelPath)
 
             Result.success(
                 when (response) {
@@ -127,28 +131,26 @@ class LocalLlmDataSource @Inject constructor(
     // ── Conversation conversion ───────────────────────────────────────────────
 
     /**
-     * Converts the Responses-API [conversationItems] JSONArray + [memories] + [tools] into
+     * Converts the Responses-API [conversationItems] JSONArray + [memories] into
      * a flat [List<LocalLlmMessage>] that [LiteRtLlmEngine] understands.
-     *
-     * Tool schemas are injected into the system message so the model knows how to call them.
      *
      * Responses-API item shapes handled:
      *  - `{"role":"user","content":"..."}` → USER
      *  - `{"role":"assistant","content":"..."}` → ASSISTANT
-     *  - `{"type":"function_call",...}` → skipped
-     *  - `{"type":"function_call_output","output":"..."}` → ASSISTANT (tool result context)
+     *  - `{"type":"function_call",...}` → ASSISTANT tool-call turn
+     *  - `{"type":"function_call_output","output":"..."}` → TOOL response turn
      */
     private fun buildMessageList(
         conversationItems: JSONArray,
-        memories: List<Memory>,
-        tools: List<AgentTool>
+        memories: List<Memory>
     ): List<LocalLlmMessage> {
         val messages = mutableListOf<LocalLlmMessage>()
+        val callIdToName = linkedMapOf<String, String>()
 
         messages.add(
             LocalLlmMessage(
                 role    = LocalLlmMessage.Role.SYSTEM,
-                content = buildSystemPrompt(memories, tools)
+                content = buildSystemPrompt(memories)
             )
         )
 
@@ -168,18 +170,53 @@ class LocalLlmDataSource @Inject constructor(
                         )
                     }
                 }
-                item.optString("type") == "function_call_output" -> {
-                    val output = item.optString("output", "")
-                    if (output.isNotBlank()) {
+                item.optString("type") == "function_call" -> {
+                    val name = item.optString("name", "").takeIf { it.isNotBlank() }
+                    if (name != null) {
+                        val callId = item.optString("call_id", "")
+                        if (callId.isNotBlank()) {
+                            callIdToName[callId] = name
+                        }
                         messages.add(
                             LocalLlmMessage(
-                                role    = LocalLlmMessage.Role.ASSISTANT,
+                                role = LocalLlmMessage.Role.ASSISTANT,
+                                toolCalls = listOf(
+                                    LocalLlmToolCallMessage(
+                                        name = name,
+                                        argumentsJson = normalizeJsonObject(
+                                            item.optString("arguments", "{}")
+                                        )
+                                    )
+                                )
+                            )
+                        )
+                    }
+                }
+                item.optString("type") == "function_call_output" -> {
+                    val output = item.optString("output", "").ifBlank { "{}" }
+                    val callId = item.optString("call_id", "")
+                    val toolName = callIdToName[callId]
+                    if (toolName != null) {
+                        messages.add(
+                            LocalLlmMessage(
+                                role = LocalLlmMessage.Role.TOOL,
+                                toolResponses = listOf(
+                                    LocalLlmToolResponseMessage(
+                                        name = toolName,
+                                        responseJson = normalizeJsonValue(output)
+                                    )
+                                )
+                            )
+                        )
+                    } else if (output.isNotBlank()) {
+                        messages.add(
+                            LocalLlmMessage(
+                                role = LocalLlmMessage.Role.ASSISTANT,
                                 content = "Tool result: $output"
                             )
                         )
                     }
                 }
-                // function_call items are skipped
             }
         }
 
@@ -205,24 +242,30 @@ class LocalLlmDataSource @Inject constructor(
         }
     }
 
-    private fun buildSystemPrompt(memories: List<Memory>, tools: List<AgentTool>): String {
+    private fun buildSystemPrompt(memories: List<Memory>): String {
         val now = java.time.Instant.ofEpochMilli(System.currentTimeMillis())
             .atZone(ZoneId.systemDefault())
             .format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss"))
 
-        val toolsSection = if (tools.isNotEmpty()) {
-            val schemas = tools.joinToString(",") { tool ->
-                """{"name":"${esc(tool.name)}","description":"${esc(tool.description)}","parameters":${tool.parametersSchema()}}"""
-            }
-            TOOLS_SECTION_TEMPLATE.replace("{{TOOL_SCHEMAS}}", schemas)
-        } else ""
-
         return SYSTEM_PROMPT_TEMPLATE
-            .replace("{{TOOLS_SECTION}}", toolsSection)
             .replace("{{MEMORIES_SECTION}}", responsesApiClient.buildMemoriesSection(memories))
             .replace("{{DATETIME}}", now)
     }
 
-    private fun esc(s: String): String =
-        s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")
+    private fun normalizeJsonObject(raw: String): String =
+        runCatching {
+            val parsed = JSONTokener(raw).nextValue()
+            if (parsed is JSONObject) parsed.toString() else JSONObject().toString()
+        }.getOrElse { JSONObject().toString() }
+
+    private fun normalizeJsonValue(raw: String): String =
+        runCatching {
+            when (val parsed = JSONTokener(raw).nextValue()) {
+                is JSONObject -> parsed.toString()
+                is JSONArray -> parsed.toString()
+                else -> JSONObject().put("result", parsed).toString()
+            }
+        }.getOrElse {
+            JSONObject().put("result", raw).toString()
+        }
 }

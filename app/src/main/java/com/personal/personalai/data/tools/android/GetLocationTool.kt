@@ -9,6 +9,7 @@ import com.personal.personalai.domain.tools.AgentTool
 import com.personal.personalai.domain.tools.ToolResult
 import dagger.hilt.android.qualifiers.ApplicationContext
 import org.json.JSONObject
+import java.util.Locale
 import javax.inject.Inject
 
 class GetLocationTool @Inject constructor(
@@ -20,6 +21,8 @@ class GetLocationTool @Inject constructor(
         Get the device's current approximate location (latitude and longitude).
         Useful for weather queries, finding nearby places, or location-aware tasks.
         Returns the last known cached location — fast with no GPS spin-up.
+        If you mention the coordinates to the user, copy the tool's `summary`,
+        `latitude_text`, and `longitude_text` values exactly without reformatting digits.
     """.trimIndent()
 
     override fun parametersSchema(): JSONObject = JSONObject(
@@ -53,12 +56,30 @@ class GetLocationTool @Inject constructor(
             if (location == null) {
                 ToolResult.Error("No cached location available. Try enabling location services and moving outdoors.")
             } else {
+                val latitudeText = formatCoordinate(location.latitude)
+                val longitudeText = formatCoordinate(location.longitude)
                 ToolResult.Success(
-                    """{"latitude":${location.latitude},"longitude":${location.longitude},"accuracy":${location.accuracy.toInt()},"provider":"${location.provider}"}"""
+                    JSONObject()
+                        .put("latitude", location.latitude)
+                        .put("longitude", location.longitude)
+                        .put("latitude_text", latitudeText)
+                        .put("longitude_text", longitudeText)
+                        .put("coordinates_text", "$latitudeText, $longitudeText")
+                        .put(
+                            "summary",
+                            "Your current coordinates are latitude $latitudeText and longitude $longitudeText."
+                        )
+                        .put("accuracy", location.accuracy.toInt())
+                        .put("accuracy_meters", location.accuracy.toInt())
+                        .put("provider", location.provider)
+                        .toString()
                 )
             }
         } catch (e: Exception) {
             ToolResult.Error("Failed to get location: ${e.message}")
         }
     }
+
+    private fun formatCoordinate(value: Double): String =
+        String.format(Locale.US, "%.5f", value)
 }
