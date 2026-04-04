@@ -1,6 +1,7 @@
 package com.personal.personalai.presentation.settings
 
 import android.content.Intent
+import android.os.Build
 import android.provider.Settings
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -17,17 +19,22 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -42,10 +49,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.personal.personalai.R
+import com.personal.personalai.localllm.api.LocalModel
+import com.personal.personalai.localllm.engine.LiteRtLlmEngine
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -97,14 +107,20 @@ fun SettingsScreen(
                         SegmentedButton(
                             selected = uiState.aiProvider == AiProvider.OPENAI,
                             onClick  = { viewModel.setAiProvider(AiProvider.OPENAI) },
-                            shape    = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
-                        ) { Text(stringResource(R.string.ai_provider_openai)) }
+                            shape    = SegmentedButtonDefaults.itemShape(index = 0, count = 3)
+                        ) { Text("OpenAI\n(Cloud)", textAlign = TextAlign.Center) }
 
                         SegmentedButton(
                             selected = uiState.aiProvider == AiProvider.OLLAMA,
                             onClick  = { viewModel.setAiProvider(AiProvider.OLLAMA) },
-                            shape    = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
-                        ) { Text(stringResource(R.string.ai_provider_ollama)) }
+                            shape    = SegmentedButtonDefaults.itemShape(index = 1, count = 3)
+                        ) { Text("Ollama\n(Dev)", textAlign = TextAlign.Center) }
+
+                        SegmentedButton(
+                            selected = uiState.aiProvider == AiProvider.LOCAL,
+                            onClick  = { viewModel.setAiProvider(AiProvider.LOCAL) },
+                            shape    = SegmentedButtonDefaults.itemShape(index = 2, count = 3)
+                        ) { Text("Local\n(Device)", textAlign = TextAlign.Center) }
                     }
 
                     // ── OpenAI tab content ────────────────────────────────────
@@ -149,6 +165,11 @@ fun SettingsScreen(
                                 }
                             }
                         }
+                    }
+
+                    // ── Local on-device tab content ───────────────────────────
+                    if (uiState.aiProvider == AiProvider.LOCAL) {
+                        LocalAiSection(uiState = uiState, viewModel = viewModel)
                     }
 
                     // ── Ollama Dev Mode tab content ───────────────────────────
@@ -341,3 +362,193 @@ fun SettingsScreen(
         )
     }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Local AI section
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun LocalAiSection(
+    uiState: SettingsUiState,
+    viewModel: SettingsViewModel
+) {
+    val isDeviceSupported = Build.VERSION.SDK_INT >= LiteRtLlmEngine.MIN_API_LEVEL
+
+    if (!isDeviceSupported) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(
+                Icons.Default.Warning,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error,
+                modifier = Modifier.size(18.dp)
+            )
+            Text(
+                "On-device AI requires Android 12 (API 31) or higher.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error
+            )
+        }
+        return
+    }
+
+    // HuggingFace token (optional, for gated model access)
+    Text(
+        "Download Gemma models to run AI fully on-device with no internet or API key required.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+    OutlinedTextField(
+        value         = uiState.hfToken,
+        onValueChange = viewModel::onHfTokenChanged,
+        label         = { Text("HuggingFace Token (optional)") },
+        placeholder   = { Text("hf_…") },
+        modifier      = Modifier.fillMaxWidth(),
+        singleLine    = true,
+        visualTransformation = PasswordVisualTransformation(),
+        supportingText = {
+            Text(
+                "Only needed for gated models. Leave blank for public models.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    )
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.End,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (uiState.hfTokenSavedSuccessfully) {
+            Text(
+                "Saved",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Spacer(Modifier.width(8.dp))
+        }
+        Button(
+            onClick  = viewModel::saveHfToken,
+            enabled  = !uiState.isHfTokenSaving
+        ) {
+            if (uiState.isHfTokenSaving) {
+                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+            } else {
+                Text("Save Token")
+            }
+        }
+    }
+
+    Spacer(Modifier.height(4.dp))
+
+    // One card per available model
+    uiState.modelStatuses.forEach { status ->
+        ModelCard(
+            status         = status,
+            isSelected     = uiState.localSelectedModel == status.model.modelId,
+            onSelect       = { viewModel.selectLocalModel(status.model.modelId) },
+            onDownload     = { viewModel.downloadModel(status.model) },
+            onCancelDownload = { viewModel.cancelDownload(status.model) },
+            onDelete       = { viewModel.deleteModel(status.model) }
+        )
+    }
+}
+
+@Composable
+private fun ModelCard(
+    status: ModelDownloadUiState,
+    isSelected: Boolean,
+    onSelect: () -> Unit,
+    onDownload: () -> Unit,
+    onCancelDownload: () -> Unit,
+    onDelete: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isSelected)
+                MaterialTheme.colorScheme.secondaryContainer
+            else
+                MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                RadioButton(selected = isSelected, onClick = onSelect)
+                Spacer(Modifier.width(4.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(status.model.displayName, style = MaterialTheme.typography.bodyMedium)
+                    if (status.isDownloaded) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Icon(
+                                Icons.Default.CheckCircle,
+                                contentDescription = null,
+                                tint   = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Text(
+                                "Downloaded",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Error message
+            if (status.error != null) {
+                Text(
+                    "Error: ${status.error}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+
+            // Progress bar while downloading
+            if (status.isDownloading) {
+                LinearProgressIndicator(
+                    progress = { status.downloadPercent / 100f },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Text(
+                    "${status.downloadPercent}%",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            // Action buttons
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                when {
+                    status.isDownloading -> {
+                        OutlinedButton(
+                            onClick = onCancelDownload,
+                            modifier = Modifier.weight(1f)
+                        ) { Text("Cancel") }
+                    }
+                    status.isDownloaded -> {
+                        OutlinedButton(
+                            onClick = onDelete,
+                            colors  = ButtonDefaults.outlinedButtonColors(
+                                contentColor = MaterialTheme.colorScheme.error
+                            ),
+                            border  = BorderStroke(1.dp, MaterialTheme.colorScheme.error),
+                            modifier = Modifier.weight(1f)
+                        ) { Text("Delete") }
+                    }
+                    else -> {
+                        Button(
+                            onClick  = onDownload,
+                            modifier = Modifier.weight(1f)
+                        ) { Text("Download") }
+                    }
+                }
+            }
+        }
+    }
+}
+

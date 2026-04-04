@@ -103,6 +103,9 @@ dependencies {
     // Networking
     implementation(libs.okhttp)
 
+    // On-device LLM module
+    implementation(project(":localllm"))
+
     // Debug
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)

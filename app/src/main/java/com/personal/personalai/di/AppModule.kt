@@ -19,7 +19,9 @@ import com.personal.personalai.data.local.dao.MemoryDao
 import com.personal.personalai.data.local.dao.MessageDao
 import com.personal.personalai.data.local.dao.ScheduledTaskDao
 import com.personal.personalai.data.audio.AudioRecorderImpl
+import com.personal.personalai.data.datasource.ai.LocalLlmDataSource
 import com.personal.personalai.data.repository.AiRepositoryImpl
+import com.personal.personalai.localllm.engine.LiteRtLlmEngine
 import com.personal.personalai.data.repository.ChatRepositoryImpl
 import com.personal.personalai.data.repository.GeofenceTaskRepositoryImpl
 import com.personal.personalai.data.repository.MemoryRepositoryImpl
@@ -110,6 +112,11 @@ object DatabaseModule {
     @Singleton
     fun provideDataStore(@ApplicationContext context: Context): DataStore<Preferences> =
         context.dataStore
+
+    @Provides
+    @Singleton
+    fun provideLiteRtLlmEngine(@ApplicationContext context: Context): LiteRtLlmEngine =
+        LiteRtLlmEngine(context)
 
     @Provides
     @Singleton

@@ -2,6 +2,7 @@ package com.personal.personalai.data.repository
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import com.personal.personalai.data.datasource.ai.LocalLlmDataSource
 import com.personal.personalai.data.datasource.ai.OllamaDataSource
 import com.personal.personalai.data.datasource.ai.OpenAiDataSource
 import com.personal.personalai.data.datasource.ai.WhisperDataSource
@@ -30,6 +31,7 @@ import javax.inject.Inject
 class AiRepositoryImpl @Inject constructor(
     private val openAiDataSource: OpenAiDataSource,
     private val ollamaDataSource: OllamaDataSource,
+    private val localLlmDataSource: LocalLlmDataSource,
     private val whisperDataSource: WhisperDataSource,
     private val dataStore: DataStore<Preferences>,
 ) : AiRepository {
@@ -43,6 +45,8 @@ class AiRepositoryImpl @Inject constructor(
         tools: List<AgentTool>
     ): Result<AgentResponse> {
         return when (readProvider()) {
+            "local" -> localLlmDataSource.sendMessageWithTools(conversationItems, memories, tools)
+
             "ollama" -> {
                 val prefs = dataStore.data.first()
                 val url = prefs[PreferencesKeys.OLLAMA_URL].orEmpty().trim()

@@ -1,5 +1,6 @@
 package com.personal.personalai.presentation.settings
 
+import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
@@ -7,7 +8,10 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.personal.personalai.domain.repository.ChatRepository
+import com.personal.personalai.localllm.api.LocalModel
+import com.personal.personalai.localllm.download.ModelDownloadManager
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,10 +25,13 @@ object PreferencesKeys {
     val OLLAMA_URL     = stringPreferencesKey("ollama_url")
     val OLLAMA_MODEL   = stringPreferencesKey("ollama_model")
     val SERPER_API_KEY = stringPreferencesKey("serper_api_key")
+    val LOCAL_MODEL    = stringPreferencesKey("local_model")
+    val HF_TOKEN       = stringPreferencesKey("hf_token")
 }
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val dataStore: DataStore<Preferences>,
     private val chatRepository: ChatRepository
 ) : ViewModel() {
@@ -34,6 +41,7 @@ class SettingsViewModel @Inject constructor(
 
     init {
         loadSettings()
+        refreshModelStatuses()
     }
 
     // ── Initialisation ────────────────────────────────────────────────────────
@@ -44,16 +52,20 @@ class SettingsViewModel @Inject constructor(
                 val providerStr = preferences[PreferencesKeys.AI_PROVIDER] ?: "openai"
                 val provider = when (providerStr) {
                     "ollama" -> AiProvider.OLLAMA
+                    "local"  -> AiProvider.LOCAL
                     else     -> AiProvider.OPENAI
                 }
 
                 _uiState.update {
                     it.copy(
-                        apiKey       = preferences[PreferencesKeys.API_KEY] ?: "",
-                        aiProvider   = provider,
-                        ollamaUrl    = preferences[PreferencesKeys.OLLAMA_URL]   ?: "",
-                        ollamaModel  = preferences[PreferencesKeys.OLLAMA_MODEL] ?: "",
-                        serperApiKey = preferences[PreferencesKeys.SERPER_API_KEY] ?: ""
+                        apiKey             = preferences[PreferencesKeys.API_KEY] ?: "",
+                        aiProvider         = provider,
+                        ollamaUrl          = preferences[PreferencesKeys.OLLAMA_URL]   ?: "",
+                        ollamaModel        = preferences[PreferencesKeys.OLLAMA_MODEL] ?: "",
+                        serperApiKey       = preferences[PreferencesKeys.SERPER_API_KEY] ?: "",
+                        localSelectedModel = preferences[PreferencesKeys.LOCAL_MODEL]
+                                                ?: LocalModel.GEMMA_4_E2B.modelId,
+                        hfToken            = preferences[PreferencesKeys.HF_TOKEN] ?: ""
                     )
                 }
             }
@@ -85,6 +97,7 @@ class SettingsViewModel @Inject constructor(
                 prefs[PreferencesKeys.AI_PROVIDER] = when (provider) {
                     AiProvider.OLLAMA -> "ollama"
                     AiProvider.OPENAI -> "openai"
+                    AiProvider.LOCAL  -> "local"
                 }
             }
             _uiState.update { it.copy(aiProvider = provider) }
@@ -130,6 +143,92 @@ class SettingsViewModel @Inject constructor(
             }.onFailure {
                 _uiState.update { it.copy(isSerperSaving = false) }
             }
+        }
+    }
+
+    // ── Local on-device model management ─────────────────────────────────────
+
+    fun onHfTokenChanged(token: String) =
+        _uiState.update { it.copy(hfToken = token, hfTokenSavedSuccessfully = false) }
+
+    fun saveHfToken() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isHfTokenSaving = true) }
+            runCatching {
+                dataStore.edit { prefs -> prefs[PreferencesKeys.HF_TOKEN] = _uiState.value.hfToken.trim() }
+                _uiState.update { it.copy(isHfTokenSaving = false, hfTokenSavedSuccessfully = true) }
+            }.onFailure {
+                _uiState.update { it.copy(isHfTokenSaving = false) }
+            }
+        }
+    }
+
+    fun selectLocalModel(modelId: String) {
+        viewModelScope.launch {
+            dataStore.edit { prefs -> prefs[PreferencesKeys.LOCAL_MODEL] = modelId }
+            _uiState.update { it.copy(localSelectedModel = modelId) }
+        }
+    }
+
+    fun downloadModel(model: LocalModel) {
+        val hfToken = _uiState.value.hfToken.trim()
+        ModelDownloadManager.enqueueDownload(context, model, hfToken)
+
+        // Mark as downloading immediately, then observe real progress
+        updateModelStatus(model) { it.copy(isDownloading = true, error = null) }
+
+        viewModelScope.launch {
+            ModelDownloadManager.getDownloadProgress(context, model).collect { progress ->
+                updateModelStatus(model) { status ->
+                    when {
+                        progress.error != null -> status.copy(
+                            isDownloading = false,
+                            error         = progress.error
+                        )
+                        progress.isCancelled -> status.copy(
+                            isDownloading = false
+                        )
+                        progress.isComplete -> status.copy(
+                            isDownloading = false,
+                            isDownloaded  = true,
+                            downloadPercent = 100
+                        )
+                        else -> status.copy(
+                            downloadPercent = progress.percent
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun cancelDownload(model: LocalModel) {
+        ModelDownloadManager.cancelDownload(context, model)
+        updateModelStatus(model) { it.copy(isDownloading = false) }
+    }
+
+    fun deleteModel(model: LocalModel) {
+        ModelDownloadManager.deleteModel(context, model)
+        updateModelStatus(model) { it.copy(isDownloaded = false, downloadPercent = 0) }
+    }
+
+    private fun refreshModelStatuses() {
+        val statuses = LocalModel.entries.map { model ->
+            ModelDownloadUiState(
+                model        = model,
+                isDownloaded = ModelDownloadManager.isDownloaded(context, model)
+            )
+        }
+        _uiState.update { it.copy(modelStatuses = statuses) }
+    }
+
+    private fun updateModelStatus(model: LocalModel, transform: (ModelDownloadUiState) -> ModelDownloadUiState) {
+        _uiState.update { state ->
+            state.copy(
+                modelStatuses = state.modelStatuses.map { s ->
+                    if (s.model == model) transform(s) else s
+                }
+            )
         }
     }
 
