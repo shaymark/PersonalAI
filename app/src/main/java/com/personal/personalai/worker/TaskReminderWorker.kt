@@ -53,14 +53,13 @@ class TaskReminderWorker @AssistedInject constructor(
             TaskType.AI_PROMPT -> handleAiTask(title)
         }
 
-        if (workResult == Result.success()) {
-            val recurrenceType = runCatching {
-                RecurrenceType.valueOf(inputData.getString(KEY_RECURRENCE_TYPE) ?: RecurrenceType.NONE.name)
-            }.getOrDefault(RecurrenceType.NONE)
-            val taskId = inputData.getLong(KEY_TASK_ID, -1L)
-            if (recurrenceType != RecurrenceType.NONE && taskId != -1L) {
-                scheduleNextOccurrence(taskId, recurrenceType)
-            }
+        // Always schedule next occurrence for recurring tasks, even on failure
+        val recurrenceType = runCatching {
+            RecurrenceType.valueOf(inputData.getString(KEY_RECURRENCE_TYPE) ?: RecurrenceType.NONE.name)
+        }.getOrDefault(RecurrenceType.NONE)
+        val taskId = inputData.getLong(KEY_TASK_ID, -1L)
+        if (recurrenceType != RecurrenceType.NONE && taskId != -1L) {
+            scheduleNextOccurrence(taskId, recurrenceType)
         }
 
         return workResult
