@@ -62,6 +62,13 @@ class QuickChatViewModel @Inject constructor(
         _uiState.update { it.copy(inputText = text) }
     }
 
+    /** Called when the user taps a quick-reply button. */
+    fun answerQuickReply(reply: String) {
+        val pending = _uiState.value.pendingInputRequest ?: return
+        _uiState.update { it.copy(pendingInputRequest = null, statusMessage = "Thinking…") }
+        userInputBroker.answer(pending.id, reply)
+    }
+
     fun sendMessage() {
         val text = _uiState.value.inputText.trim()
         if (text.isEmpty()) return

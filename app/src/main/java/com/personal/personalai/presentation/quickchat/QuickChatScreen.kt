@@ -176,6 +176,19 @@ fun QuickChatScreen(
                                 color = MaterialTheme.colorScheme.error
                             )
                         }
+
+                        uiState.pendingInputRequest?.quickReplies?.takeIf { it.isNotEmpty() }?.let { replies ->
+                            Spacer(Modifier.height(8.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                replies.forEach { reply ->
+                                    androidx.compose.material3.OutlinedButton(
+                                        onClick = { viewModel.answerQuickReply(reply) }
+                                    ) {
+                                        Text(reply)
+                                    }
+                                }
+                            }
+                        }
                     }
 
                     Spacer(Modifier.height(8.dp))

@@ -291,17 +291,30 @@ fun ChatScreen(
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 4.dp)
                     ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Text("❓", style = MaterialTheme.typography.titleMedium)
-                            Text(
-                                text = request.question,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer
-                            )
+                        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text("❓", style = MaterialTheme.typography.titleMedium)
+                                Text(
+                                    text = request.question,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                            }
+                            if (!request.quickReplies.isNullOrEmpty()) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    request.quickReplies.forEach { reply ->
+                                        androidx.compose.material3.OutlinedButton(
+                                            onClick = { viewModel.answerQuickReply(reply) }
+                                        ) {
+                                            Text(reply)
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }

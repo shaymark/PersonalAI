@@ -82,6 +82,13 @@ class ChatViewModel @Inject constructor(
         _uiState.update { it.copy(inputText = text) }
     }
 
+    /** Called when the user taps a quick-reply button on the question card. */
+    fun answerQuickReply(reply: String) {
+        val pending = _uiState.value.pendingInputRequest ?: return
+        _uiState.update { it.copy(pendingInputRequest = null) }
+        userInputBroker.answer(pending.id, reply)
+    }
+
     fun sendMessage() {
         val text = _uiState.value.inputText.trim()
         if (text.isEmpty()) return

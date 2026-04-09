@@ -20,21 +20,31 @@ import javax.inject.Singleton
 @Singleton
 class UserInputBroker @Inject constructor() {
 
-    data class Request(val id: String, val question: String)
+    data class Request(
+        val id: String,
+        val question: String,
+        val quickReplies: List<String>? = null
+    )
 
     private val _incoming = MutableSharedFlow<Request>(extraBufferCapacity = 1)
 
     /** ViewModel collects this to show the question card. */
     val incoming: SharedFlow<Request> = _incoming
 
+    /** True when a UI is actively observing questions (false in background mode). */
+    val isActive: Boolean get() = _incoming.subscriptionCount.value > 0
+
     private val pending = ConcurrentHashMap<String, CompletableDeferred<String>>()
 
-    /** Called by [AskUserTool]: suspends until the user submits an answer. */
-    suspend fun askAndAwait(question: String): String {
+    /** Called by tools: suspends until the user submits an answer. */
+    suspend fun askAndAwait(
+        question: String,
+        quickReplies: List<String>? = null
+    ): String {
         val id = UUID.randomUUID().toString()
         val deferred = CompletableDeferred<String>()
         pending[id] = deferred
-        _incoming.emit(Request(id, question))
+        _incoming.emit(Request(id, question, quickReplies))
         return deferred.await()
     }
 

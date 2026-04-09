@@ -8,12 +8,14 @@ import android.telephony.SmsManager
 import androidx.core.content.ContextCompat
 import com.personal.personalai.domain.tools.AgentTool
 import com.personal.personalai.domain.tools.ToolResult
+import com.personal.personalai.domain.tools.UserInputBroker
 import dagger.hilt.android.qualifiers.ApplicationContext
 import org.json.JSONObject
 import javax.inject.Inject
 
 class SendSmsTool @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val userInputBroker: UserInputBroker
 ) : AgentTool {
 
     override val name = "send_sms"
@@ -30,6 +32,10 @@ class SendSmsTool @Inject constructor(
                 "phone_number": {
                     "type": "string",
                     "description": "The phone number to send to, e.g. '+15551234567' or '055-123-4567'"
+                },
+                "contact_name": {
+                    "type": "string",
+                    "description": "The contact's display name (if known)"
                 },
                 "message": {
                     "type": "string",
@@ -51,6 +57,22 @@ class SendSmsTool @Inject constructor(
             ?: return ToolResult.Error("phone_number parameter is required")
         val message = params.optString("message", "").takeIf { it.isNotBlank() }
             ?: return ToolResult.Error("message parameter is required")
+        val contactName = params.optString("contact_name", "").takeIf { it.isNotBlank() }
+
+        // In foreground mode, ask user for confirmation before sending
+        if (userInputBroker.isActive) {
+            val recipient = if (contactName != null) "$contactName ($phoneNumber)" else phoneNumber
+            val confirmation = buildString {
+                append("Send this SMS?\n\n")
+                append("To: $recipient\n")
+                append("Message: \"$message\"\n\n")
+                append("Reply \"yes\" to send or \"no\" to cancel.")
+            }
+            val answer = userInputBroker.askAndAwait(confirmation, quickReplies = listOf("Yes", "No"))
+            if (!answer.trim().lowercase().let { it.startsWith("y") || it == "send" }) {
+                return ToolResult.Success("""{"sent":false,"reason":"User cancelled"}""")
+            }
+        }
 
         return try {
             val smsManager = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
