@@ -1,9 +1,14 @@
 package com.personal.personalai.presentation.quickchat
 
 import android.Manifest
+import android.app.Activity
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.app.ActivityCompat
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -73,11 +78,82 @@ fun QuickChatScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val focusRequester = remember { FocusRequester() }
     val context = LocalContext.current
+    val activity = context as? Activity
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         if (!isGranted) viewModel.onMicPermissionDenied()
+    }
+
+    // Single-permission launcher for agent-requested permissions (SMS, Contacts, etc.)
+    val agentPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        uiState.pendingPermissionRequest?.let { req ->
+            if (!granted && activity != null &&
+                !ActivityCompat.shouldShowRequestPermissionRationale(activity, req.permission)
+            ) {
+                context.startActivity(
+                    Intent(
+                        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        Uri.fromParts("package", context.packageName, null)
+                    )
+                )
+            }
+            viewModel.resolvePermission(req.id, granted)
+        }
+    }
+
+    // Multi-permission launcher used for fine+coarse location together.
+    val agentMultiPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { results ->
+        uiState.pendingPermissionRequest?.let { req ->
+            val granted = results[req.permission] == true
+            if (!granted && activity != null &&
+                !ActivityCompat.shouldShowRequestPermissionRationale(activity, req.permission)
+            ) {
+                context.startActivity(
+                    Intent(
+                        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        Uri.fromParts("package", context.packageName, null)
+                    )
+                )
+            }
+            viewModel.resolvePermission(req.id, granted)
+        }
+    }
+
+    // Fire the appropriate launcher when the agent loop requests a permission.
+    val pendingPerm = uiState.pendingPermissionRequest
+    LaunchedEffect(pendingPerm?.id) {
+        val req = pendingPerm ?: return@LaunchedEffect
+        when (req.permission) {
+            Manifest.permission.ACCESS_BACKGROUND_LOCATION -> {
+                if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
+                    != PackageManager.PERMISSION_GRANTED
+                ) {
+                    agentMultiPermissionLauncher.launch(
+                        arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
+                    )
+                } else {
+                    context.startActivity(
+                        Intent(
+                            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                            Uri.fromParts("package", context.packageName, null)
+                        )
+                    )
+                    viewModel.resolvePermission(req.id, false)
+                }
+            }
+            Manifest.permission.ACCESS_FINE_LOCATION -> {
+                agentMultiPermissionLauncher.launch(
+                    arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
+                )
+            }
+            else -> agentPermissionLauncher.launch(req.permission)
+        }
     }
 
     LaunchedEffect(Unit) {

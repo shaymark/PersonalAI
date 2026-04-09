@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.personal.personalai.domain.audio.AudioRecorder
+import com.personal.personalai.domain.tools.PermissionBroker
 import com.personal.personalai.domain.tools.UserInputBroker
 import com.personal.personalai.domain.usecase.AgentLoopUseCase
 import com.personal.personalai.domain.usecase.AgentStep
@@ -23,6 +24,7 @@ import javax.inject.Inject
 class QuickChatViewModel @Inject constructor(
     private val agentLoopUseCase: AgentLoopUseCase,
     private val userInputBroker: UserInputBroker,
+    private val permissionBroker: PermissionBroker,
     private val audioRecorder: AudioRecorder,
     private val transcribeAudioUseCase: TranscribeAudioUseCase,
     @ApplicationContext private val context: Context
@@ -34,6 +36,7 @@ class QuickChatViewModel @Inject constructor(
         val response: String? = null,
         val statusMessage: String? = null,
         val pendingInputRequest: UserInputBroker.Request? = null,
+        val pendingPermissionRequest: PermissionBroker.Request? = null,
         val voiceState: VoiceState = VoiceState.IDLE,
         val error: String? = null
     )
@@ -43,6 +46,7 @@ class QuickChatViewModel @Inject constructor(
 
     init {
         observeUserInputRequests()
+        observePermissionRequests()
     }
 
     private fun observeUserInputRequests() {
@@ -56,6 +60,19 @@ class QuickChatViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    private fun observePermissionRequests() {
+        viewModelScope.launch {
+            permissionBroker.incoming.collect { request ->
+                _uiState.update { it.copy(pendingPermissionRequest = request) }
+            }
+        }
+    }
+
+    fun resolvePermission(requestId: String, granted: Boolean) {
+        _uiState.update { it.copy(pendingPermissionRequest = null) }
+        permissionBroker.resolve(requestId, granted)
     }
 
     fun onInputChanged(text: String) {
