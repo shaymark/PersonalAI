@@ -65,7 +65,6 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LibraryScreen(
-    innerPadding: PaddingValues,
     viewModel: LibraryViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -102,7 +101,6 @@ fun LibraryScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(bottom = innerPadding.calculateBottomPadding())
         ) {
             val tabs = listOf(
                 stringResource(R.string.library_tab_files),

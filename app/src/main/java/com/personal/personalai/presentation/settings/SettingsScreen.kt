@@ -61,7 +61,6 @@ import com.personal.personalai.localllm.engine.LiteRtLlmEngine
 @Composable
 fun SettingsScreen(
     onNavigateBack: () -> Unit,
-    innerPadding: PaddingValues = PaddingValues(),
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -86,7 +85,6 @@ fun SettingsScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
                 .padding(16.dp)
-                .padding(bottom = innerPadding.calculateBottomPadding())
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {

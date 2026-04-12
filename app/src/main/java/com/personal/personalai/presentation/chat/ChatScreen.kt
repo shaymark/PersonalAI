@@ -89,7 +89,6 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreen(
-    innerPadding: PaddingValues,
     onNavigateToSettings: () -> Unit,
     viewModel: ChatViewModel = hiltViewModel()
 ) {
@@ -228,7 +227,6 @@ fun ChatScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(scaffoldPadding)
-                    .padding(bottom = innerPadding.calculateBottomPadding())
             ) {
                 if (uiState.messages.isEmpty() && !uiState.isLoading) {
                     WelcomePlaceholder(modifier = Modifier.weight(1f))
@@ -344,14 +342,9 @@ fun ChatScreen(
             }
         }
 
-        // Standalone SnackbarHost positioned above the outer bottom navigation bar.
-        // Using innerPadding.calculateBottomPadding() ensures it clears the nav bar
-        // regardless of its height.
         SnackbarHost(
             hostState = snackbarHostState,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = innerPadding.calculateBottomPadding())
+            modifier = Modifier.align(Alignment.BottomCenter)
         )
     }
 }

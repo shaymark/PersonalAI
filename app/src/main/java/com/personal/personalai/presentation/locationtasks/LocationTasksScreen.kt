@@ -62,7 +62,6 @@ import com.personal.personalai.domain.model.TaskType
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LocationTasksScreen(
-    innerPadding: PaddingValues,
     viewModel: LocationTasksViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -86,8 +85,7 @@ fun LocationTasksScreen(
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = viewModel::showAddDialog,
-                modifier = Modifier.padding(bottom = innerPadding.calculateBottomPadding())
+                onClick = viewModel::showAddDialog
             ) {
                 Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add_location_task_description))
             }
@@ -98,7 +96,6 @@ fun LocationTasksScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(bottom = innerPadding.calculateBottomPadding())
         ) {
             if (uiState.tasks.isEmpty() && !uiState.isLoading) {
                 Column(

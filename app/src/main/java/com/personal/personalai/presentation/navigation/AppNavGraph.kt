@@ -5,6 +5,8 @@ import androidx.compose.material.icons.filled.Bookmarks
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -12,6 +14,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.personal.personalai.R
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -79,27 +82,28 @@ fun AppNavGraph() {
     ) { innerPadding ->
         NavHost(
             navController = navController,
-            startDestination = Screen.Chat.route
+            startDestination = Screen.Chat.route,
+            modifier = Modifier
+                .consumeWindowInsets(innerPadding)
+                .padding(innerPadding)
         ) {
             composable(Screen.Chat.route) {
                 ChatScreen(
-                    innerPadding = innerPadding,
                     onNavigateToSettings = { navController.navigate(Screen.Settings.route) }
                 )
             }
             composable(Screen.ScheduledTasks.route) {
-                ScheduledTasksScreen(innerPadding = innerPadding)
+                ScheduledTasksScreen()
             }
             composable(Screen.LocationTasks.route) {
-                LocationTasksScreen(innerPadding = innerPadding)
+                LocationTasksScreen()
             }
             composable(Screen.Library.route) {
-                LibraryScreen(innerPadding = innerPadding)
+                LibraryScreen()
             }
             composable(Screen.Settings.route) {
                 SettingsScreen(
-                    onNavigateBack = { navController.popBackStack() },
-                    innerPadding = innerPadding
+                    onNavigateBack = { navController.popBackStack() }
                 )
             }
         }

@@ -65,7 +65,6 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ScheduledTasksScreen(
-    innerPadding: PaddingValues,
     viewModel: ScheduledTasksViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -82,8 +81,7 @@ fun ScheduledTasksScreen(
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = viewModel::showAddDialog,
-                modifier = Modifier.padding(bottom = innerPadding.calculateBottomPadding())
+                onClick = viewModel::showAddDialog
             ) {
                 Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add_task_description))
             }
@@ -93,7 +91,6 @@ fun ScheduledTasksScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(scaffoldPadding)
-                .padding(bottom = innerPadding.calculateBottomPadding())
         ) {
             if (uiState.tasks.isEmpty() && !uiState.isLoading) {
                 EmptyState(modifier = Modifier.align(Alignment.Center))
