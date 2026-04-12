@@ -9,6 +9,7 @@ import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.ActivityCompat
+import com.personal.personalai.presentation.common.MarkdownText
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -237,7 +238,7 @@ fun QuickChatScreen(
 
                         uiState.response?.let { response ->
                             SelectionContainer {
-                                Text(
+                                MarkdownText(
                                     text = response,
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurface
