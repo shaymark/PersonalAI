@@ -19,6 +19,9 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import org.json.JSONArray
 import org.json.JSONObject
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 
 sealed class AgentStep {
@@ -30,6 +33,19 @@ sealed class AgentStep {
 
 private const val MAX_ITERATIONS = 8
 private const val TAG = "AgentLoopUseCase"
+
+/** Base size of the rolling chat-history window sent to the LLM. */
+private const val HISTORY_WINDOW = 20
+
+/**
+ * Older messages within this window of "now" are kept in the prompt even if
+ * they fall outside [HISTORY_WINDOW], so the cached prompt prefix stays stable
+ * across rapid back-to-back turns and OpenAI's prompt cache hits.
+ */
+private const val CACHE_STICKINESS_MS = 5L * 60L * 1000L
+
+private val DATE_FORMATTER: DateTimeFormatter =
+    DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")
 
 /**
  * Orchestrates the multi-turn agent loop:
@@ -62,24 +78,47 @@ class AgentLoopUseCase @Inject constructor(
         val tools = if (backgroundMode) toolRegistry.getBackgroundSafeTools()
                     else toolRegistry.getTools()
 
-        // 3. Build initial conversationItems from recent history
+        // 3. Build initial conversationItems from recent history.
+        //
+        // Window strategy: take the last HISTORY_WINDOW messages, then extend
+        // backwards as long as the next-older message was sent within
+        // CACHE_STICKINESS_MS of now. This keeps the same starting message
+        // across rapid back-to-back turns so the OpenAI prompt cache hits.
         val conversationItems = JSONArray()
         if (!backgroundMode) {
-            // Include recent history for context (the user message we just saved is last)
-            chatRepository.getMessages().first()
-                .takeLast(20)
-                .forEach { msg ->
-                    conversationItems.put(JSONObject().apply {
-                        put("role", if (msg.role == MessageRole.USER) "user" else "assistant")
-                        put("content", msg.content)
-                    })
-                }
+            val all = chatRepository.getMessages().first()
+            val now = System.currentTimeMillis()
+            val stickyCutoff = now - CACHE_STICKINESS_MS
+            var startIdx = (all.size - HISTORY_WINDOW).coerceAtLeast(0)
+            while (startIdx > 0 && all[startIdx - 1].timestamp >= stickyCutoff) {
+                startIdx--
+            }
+            all.subList(startIdx, all.size).forEach { msg ->
+                conversationItems.put(JSONObject().apply {
+                    put("role", if (msg.role == MessageRole.USER) "user" else "assistant")
+                    put("content", msg.content)
+                })
+            }
         } else {
             // Background: just the AI prompt as the single user turn
             conversationItems.put(JSONObject().apply {
                 put("role", "user")
                 put("content", message)
             })
+        }
+
+        // Inject the current date/time on the latest user turn rather than the
+        // system prompt, so the cached system-prompt prefix stays byte-stable.
+        val nowIso = Instant.ofEpochMilli(System.currentTimeMillis())
+            .atZone(ZoneId.systemDefault())
+            .format(DATE_FORMATTER)
+        for (i in conversationItems.length() - 1 downTo 0) {
+            val item = conversationItems.getJSONObject(i)
+            if (item.optString("role") == "user") {
+                val original = item.optString("content")
+                item.put("content", "[Current time: $nowIso]\n\n$original")
+                break
+            }
         }
 
         // 4. Agent loop

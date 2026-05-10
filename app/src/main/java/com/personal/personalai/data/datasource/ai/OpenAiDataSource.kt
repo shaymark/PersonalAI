@@ -41,9 +41,10 @@ class OpenAiDataSource @Inject constructor(
             response. If you need any information to complete a task (a time, a name, a preference,
             a confirmation), you MUST call the ask_user tool instead. Only use your text response
             for final answers and confirmations after all necessary information has been gathered.
-            Asking a question in plain text is not allowed — always use ask_user.
+
+            The current date/time is injected into the latest user message as
+            [Current time: yyyy-MM-dd'T'HH:mm:ss]. Use that whenever a query needs "now".
             {{MEMORIES_SECTION}}
-            Current date and time: {{DATETIME}}
         """.trimIndent()
     }
 
@@ -93,10 +94,7 @@ class OpenAiDataSource @Inject constructor(
 
     // ── System prompts ────────────────────────────────────────────────────────
 
-    private fun buildToolsSystemPrompt(memories: List<Memory>): String {
-        val now = apiClient.formatEpochToIso(System.currentTimeMillis())
-        return TOOLS_SYSTEM_PROMPT_TEMPLATE
+    private fun buildToolsSystemPrompt(memories: List<Memory>): String =
+        TOOLS_SYSTEM_PROMPT_TEMPLATE
             .replace("{{MEMORIES_SECTION}}", apiClient.buildMemoriesSection(memories))
-            .replace("{{DATETIME}}", now)
-    }
 }
