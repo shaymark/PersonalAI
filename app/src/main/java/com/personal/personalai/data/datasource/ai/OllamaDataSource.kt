@@ -98,7 +98,14 @@ class OllamaDataSource @Inject constructor(
 
             // Construct the full endpoint URL; apiKey = "" → no Authorization header
             val url = "${baseUrl.trimEnd('/')}$RESPONSES_PATH"
-            apiClient.executeRequest(url, "", requestBody) { responseBody ->
+            apiClient.executeRequest(
+                url = url,
+                apiKey = "",
+                requestBody = requestBody,
+                provider = "ollama",
+                model = model,
+                apiType = "responses",
+            ) { responseBody ->
                 apiClient.parseAgentResponse(responseBody)
             }
         } catch (e: Exception) {

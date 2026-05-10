@@ -76,7 +76,14 @@ class OpenAiDataSource @Inject constructor(
                 put("input", conversationItems)
             }
 
-            apiClient.executeRequest(OPENAI_URL, apiKey, requestBody) { responseBody ->
+            apiClient.executeRequest(
+                url = OPENAI_URL,
+                apiKey = apiKey,
+                requestBody = requestBody,
+                provider = "openai",
+                model = MODEL,
+                apiType = "responses",
+            ) { responseBody ->
                 apiClient.parseAgentResponse(responseBody)
             }
         } catch (e: Exception) {

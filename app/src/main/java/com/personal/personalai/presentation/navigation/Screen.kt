@@ -6,4 +6,5 @@ sealed class Screen(val route: String) {
     object LocationTasks : Screen("location_tasks")
     object Library : Screen("library")
     object Settings : Screen("settings")
+    object ApiUsage : Screen("api_usage")
 }

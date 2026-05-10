@@ -13,7 +13,9 @@ import com.personal.personalai.data.local.MIGRATION_2_3
 import com.personal.personalai.data.local.MIGRATION_3_4
 import com.personal.personalai.data.local.MIGRATION_4_5
 import com.personal.personalai.data.local.MIGRATION_5_6
+import com.personal.personalai.data.local.MIGRATION_6_7
 import com.personal.personalai.data.local.PersonalAIDatabase
+import com.personal.personalai.data.local.dao.ApiUsageLogDao
 import com.personal.personalai.data.local.dao.GeofenceTaskDao
 import com.personal.personalai.data.local.dao.MemoryDao
 import com.personal.personalai.data.local.dao.MessageDao
@@ -21,6 +23,7 @@ import com.personal.personalai.data.local.dao.ScheduledTaskDao
 import com.personal.personalai.data.audio.AudioRecorderImpl
 import com.personal.personalai.data.datasource.ai.LocalLlmDataSource
 import com.personal.personalai.data.repository.AiRepositoryImpl
+import com.personal.personalai.data.repository.ApiUsageRepositoryImpl
 import com.personal.personalai.localllm.engine.LiteRtLlmEngine
 import com.personal.personalai.data.repository.ChatRepositoryImpl
 import com.personal.personalai.data.repository.GeofenceTaskRepositoryImpl
@@ -55,6 +58,7 @@ import com.personal.personalai.data.tools.files.WriteFileTool
 import com.personal.personalai.data.tools.web.WebSearchTool
 import com.personal.personalai.domain.audio.AudioRecorder
 import com.personal.personalai.domain.repository.AiRepository
+import com.personal.personalai.domain.repository.ApiUsageRepository
 import com.personal.personalai.domain.repository.ChatRepository
 import com.personal.personalai.domain.repository.GeofenceTaskRepository
 import com.personal.personalai.domain.repository.MemoryRepository
@@ -83,7 +87,14 @@ object DatabaseModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): PersonalAIDatabase =
         Room.databaseBuilder(context, PersonalAIDatabase::class.java, "personal_ai_db")
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+            .addMigrations(
+                MIGRATION_1_2,
+                MIGRATION_2_3,
+                MIGRATION_3_4,
+                MIGRATION_4_5,
+                MIGRATION_5_6,
+                MIGRATION_6_7,
+            )
             .build()
 
     @Provides
@@ -97,6 +108,9 @@ object DatabaseModule {
 
     @Provides
     fun provideGeofenceTaskDao(db: PersonalAIDatabase): GeofenceTaskDao = db.geofenceTaskDao()
+
+    @Provides
+    fun provideApiUsageLogDao(db: PersonalAIDatabase): ApiUsageLogDao = db.apiUsageLogDao()
 
     @Provides
     @Singleton
@@ -155,6 +169,10 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindGeofenceTaskRepository(impl: GeofenceTaskRepositoryImpl): GeofenceTaskRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindApiUsageRepository(impl: ApiUsageRepositoryImpl): ApiUsageRepository
 }
 
 @Module

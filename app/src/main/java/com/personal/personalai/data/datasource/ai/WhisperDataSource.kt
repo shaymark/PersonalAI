@@ -1,5 +1,9 @@
 package com.personal.personalai.data.datasource.ai
 
+import android.media.MediaMetadataRetriever
+import com.personal.personalai.data.datasource.ai.usage.OpenAiPricing
+import com.personal.personalai.domain.model.ApiUsageLog
+import com.personal.personalai.domain.repository.ApiUsageRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -17,9 +21,13 @@ import javax.inject.Inject
  * Sends a multipart POST to `/v1/audio/transcriptions` and returns the
  * transcribed text. Uses the same [OkHttpClient] as [OpenAiDataSource] —
  * no additional networking dependency is required.
+ *
+ * Each call is logged to [ApiUsageRepository]; cost is estimated from the
+ * audio file's duration ($0.006 / minute).
  */
 class WhisperDataSource @Inject constructor(
-    private val okHttpClient: OkHttpClient
+    private val okHttpClient: OkHttpClient,
+    private val apiUsageRepository: ApiUsageRepository,
 ) {
 
     companion object {
@@ -35,6 +43,8 @@ class WhisperDataSource @Inject constructor(
      */
     suspend fun transcribe(apiKey: String, audioFile: File): Result<String> =
         withContext(Dispatchers.IO) {
+            val durationSeconds = readDurationSeconds(audioFile)
+            val start = System.currentTimeMillis()
             try {
                 val requestBody = MultipartBody.Builder()
                     .setType(MultipartBody.FORM)
@@ -54,19 +64,67 @@ class WhisperDataSource @Inject constructor(
 
                 val response = okHttpClient.newCall(request).execute()
                 val responseBody = response.body?.string()
-                    ?: return@withContext Result.failure(Exception("Empty response from Whisper"))
+                val latencyMs = System.currentTimeMillis() - start
+
+                if (responseBody == null) {
+                    logCall(durationSeconds, latencyMs, success = false, error = "Empty response from Whisper")
+                    return@withContext Result.failure(Exception("Empty response from Whisper"))
+                }
 
                 if (!response.isSuccessful) {
                     val errorMsg = runCatching {
                         JSONObject(responseBody).getJSONObject("error").getString("message")
                     }.getOrDefault("Whisper error: HTTP ${response.code}")
+                    logCall(durationSeconds, latencyMs, success = false, error = errorMsg)
                     return@withContext Result.failure(Exception(errorMsg))
                 }
 
                 val text = JSONObject(responseBody).getString("text").trim()
+                logCall(durationSeconds, latencyMs, success = true, error = null)
                 Result.success(text)
             } catch (e: Exception) {
+                val latencyMs = System.currentTimeMillis() - start
+                logCall(durationSeconds, latencyMs, success = false, error = e.message ?: e.javaClass.simpleName)
                 Result.failure(e)
             }
         }
+
+    private suspend fun logCall(
+        durationSeconds: Double?,
+        latencyMs: Long,
+        success: Boolean,
+        error: String?,
+    ) {
+        runCatching {
+            val cost = if (success && durationSeconds != null) {
+                OpenAiPricing.estimateWhisperCostUsd(durationSeconds)
+            } else 0.0
+            apiUsageRepository.logCall(
+                ApiUsageLog(
+                    timestamp = System.currentTimeMillis(),
+                    provider = "openai",
+                    model = MODEL,
+                    apiType = "transcription",
+                    audioDurationSeconds = durationSeconds,
+                    estimatedCostUsd = cost,
+                    latencyMs = latencyMs,
+                    success = success,
+                    errorMessage = error,
+                )
+            )
+        }
+    }
+
+    private fun readDurationSeconds(audioFile: File): Double? {
+        val mmr = MediaMetadataRetriever()
+        return try {
+            mmr.setDataSource(audioFile.absolutePath)
+            val ms = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()
+            ms?.let { it / 1000.0 }
+        } catch (_: Exception) {
+            null
+        } finally {
+            runCatching { mmr.release() }
+        }
+    }
 }

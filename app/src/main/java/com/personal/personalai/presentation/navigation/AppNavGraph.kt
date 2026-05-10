@@ -23,6 +23,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.personal.personalai.presentation.apiusage.ApiUsageScreen
 import com.personal.personalai.presentation.chat.ChatScreen
 import com.personal.personalai.presentation.library.LibraryScreen
 import com.personal.personalai.presentation.locationtasks.LocationTasksScreen
@@ -103,6 +104,12 @@ fun AppNavGraph() {
             }
             composable(Screen.Settings.route) {
                 SettingsScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToApiUsage = { navController.navigate(Screen.ApiUsage.route) }
+                )
+            }
+            composable(Screen.ApiUsage.route) {
+                ApiUsageScreen(
                     onNavigateBack = { navController.popBackStack() }
                 )
             }

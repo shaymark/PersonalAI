@@ -4,10 +4,12 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.personal.personalai.data.local.dao.ApiUsageLogDao
 import com.personal.personalai.data.local.dao.GeofenceTaskDao
 import com.personal.personalai.data.local.dao.MemoryDao
 import com.personal.personalai.data.local.dao.MessageDao
 import com.personal.personalai.data.local.dao.ScheduledTaskDao
+import com.personal.personalai.data.local.entity.ApiUsageLogEntity
 import com.personal.personalai.data.local.entity.GeofenceTaskEntity
 import com.personal.personalai.data.local.entity.MemoryEntity
 import com.personal.personalai.data.local.entity.MessageEntity
@@ -71,9 +73,40 @@ val MIGRATION_5_6 = object : Migration(5, 6) {
     }
 }
 
+val MIGRATION_6_7 = object : Migration(6, 7) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        database.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS api_usage_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                timestamp INTEGER NOT NULL,
+                provider TEXT NOT NULL,
+                model TEXT NOT NULL,
+                apiType TEXT NOT NULL,
+                inputTokens INTEGER NOT NULL DEFAULT 0,
+                outputTokens INTEGER NOT NULL DEFAULT 0,
+                cachedInputTokens INTEGER NOT NULL DEFAULT 0,
+                totalTokens INTEGER NOT NULL DEFAULT 0,
+                audioDurationSeconds REAL,
+                estimatedCostUsd REAL NOT NULL DEFAULT 0.0,
+                latencyMs INTEGER NOT NULL DEFAULT 0,
+                success INTEGER NOT NULL DEFAULT 1,
+                errorMessage TEXT
+            )
+            """.trimIndent()
+        )
+    }
+}
+
 @Database(
-    entities = [MessageEntity::class, ScheduledTaskEntity::class, MemoryEntity::class, GeofenceTaskEntity::class],
-    version = 6,
+    entities = [
+        MessageEntity::class,
+        ScheduledTaskEntity::class,
+        MemoryEntity::class,
+        GeofenceTaskEntity::class,
+        ApiUsageLogEntity::class,
+    ],
+    version = 7,
     exportSchema = false
 )
 abstract class PersonalAIDatabase : RoomDatabase() {
@@ -81,4 +114,5 @@ abstract class PersonalAIDatabase : RoomDatabase() {
     abstract fun scheduledTaskDao(): ScheduledTaskDao
     abstract fun memoryDao(): MemoryDao
     abstract fun geofenceTaskDao(): GeofenceTaskDao
+    abstract fun apiUsageLogDao(): ApiUsageLogDao
 }
