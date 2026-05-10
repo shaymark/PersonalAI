@@ -47,6 +47,11 @@ private const val CACHE_STICKINESS_MS = 5L * 60L * 1000L
 private val DATE_FORMATTER: DateTimeFormatter =
     DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")
 
+private fun formatIso(epochMillis: Long): String =
+    Instant.ofEpochMilli(epochMillis)
+        .atZone(ZoneId.systemDefault())
+        .format(DATE_FORMATTER)
+
 /**
  * Orchestrates the multi-turn agent loop:
  * 1. Build conversation from history + memories + tool definitions
@@ -96,29 +101,29 @@ class AgentLoopUseCase @Inject constructor(
             all.subList(startIdx, all.size).forEach { msg ->
                 conversationItems.put(JSONObject().apply {
                     put("role", if (msg.role == MessageRole.USER) "user" else "assistant")
-                    put("content", msg.content)
+                    // Stamp every user turn with its own immutable send-time.
+                    // Because the stamp is derived from msg.timestamp (fixed at
+                    // save), older user messages render identically on every
+                    // subsequent call → the prompt cache prefix stays stable.
+                    put(
+                        "content",
+                        if (msg.role == MessageRole.USER) {
+                            "[Sent at: ${formatIso(msg.timestamp)}]\n\n${msg.content}"
+                        } else {
+                            msg.content
+                        }
+                    )
                 })
             }
         } else {
             // Background: just the AI prompt as the single user turn
             conversationItems.put(JSONObject().apply {
                 put("role", "user")
-                put("content", message)
+                put(
+                    "content",
+                    "[Sent at: ${formatIso(System.currentTimeMillis())}]\n\n$message"
+                )
             })
-        }
-
-        // Inject the current date/time on the latest user turn rather than the
-        // system prompt, so the cached system-prompt prefix stays byte-stable.
-        val nowIso = Instant.ofEpochMilli(System.currentTimeMillis())
-            .atZone(ZoneId.systemDefault())
-            .format(DATE_FORMATTER)
-        for (i in conversationItems.length() - 1 downTo 0) {
-            val item = conversationItems.getJSONObject(i)
-            if (item.optString("role") == "user") {
-                val original = item.optString("content")
-                item.put("content", "[Current time: $nowIso]\n\n$original")
-                break
-            }
         }
 
         // 4. Agent loop

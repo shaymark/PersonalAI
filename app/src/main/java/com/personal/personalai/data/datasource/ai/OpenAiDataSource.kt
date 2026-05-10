@@ -42,8 +42,10 @@ class OpenAiDataSource @Inject constructor(
             a confirmation), you MUST call the ask_user tool instead. Only use your text response
             for final answers and confirmations after all necessary information has been gathered.
 
-            The current date/time is injected into the latest user message as
-            [Current time: yyyy-MM-dd'T'HH:mm:ss]. Use that whenever a query needs "now".
+            Every user message starts with a [Sent at: yyyy-MM-dd'T'HH:mm:ss] line
+            in device local time. Treat the most recent one as the current time.
+            Use these stamps for any reasoning that depends on "now", relative time,
+            or how long ago an earlier message was sent.
             {{MEMORIES_SECTION}}
         """.trimIndent()
     }
