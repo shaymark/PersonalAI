@@ -175,7 +175,9 @@ class ResponsesApiClient @Inject constructor(
      * item is returned as [AgentResponse.Text].
      */
     fun parseAgentResponse(responseBody: String): Result<AgentResponse> {
-        val output = JSONObject(responseBody).getJSONArray("output")
+        val root = JSONObject(responseBody)
+        val responseId = root.optString("id").takeIf { it.isNotBlank() }
+        val output = root.getJSONArray("output")
         val functionCalls = mutableListOf<FunctionCall>()
 
         for (i in 0 until output.length()) {
@@ -197,7 +199,10 @@ class ResponsesApiClient @Inject constructor(
                             val contentItem = content.getJSONObject(j)
                             if (contentItem.optString("type") == "output_text") {
                                 return Result.success(
-                                    AgentResponse.Text(contentItem.getString("text").trim())
+                                    AgentResponse.Text(
+                                        contentItem.getString("text").trim(),
+                                        responseId = responseId,
+                                    )
                                 )
                             }
                         }
@@ -207,7 +212,7 @@ class ResponsesApiClient @Inject constructor(
         }
 
         return if (functionCalls.isNotEmpty()) {
-            Result.success(AgentResponse.ToolCalls(functionCalls))
+            Result.success(AgentResponse.ToolCalls(functionCalls, responseId = responseId))
         } else {
             Result.failure(Exception("No text or function calls in response"))
         }

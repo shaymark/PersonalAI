@@ -2,16 +2,21 @@ package com.personal.personalai.domain.usecase
 
 import android.os.SystemClock
 import android.util.Log
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.edit
+import com.personal.personalai.domain.model.Memory
 import com.personal.personalai.domain.model.Message
 import com.personal.personalai.domain.model.MessageRole
 import com.personal.personalai.domain.repository.AiRepository
 import com.personal.personalai.domain.repository.ChatRepository
 import com.personal.personalai.domain.repository.MemoryRepository
 import com.personal.personalai.domain.tools.AgentResponse
-import com.personal.personalai.domain.tools.FunctionCall
+import com.personal.personalai.domain.tools.AgentTool
 import com.personal.personalai.domain.tools.PermissionBroker
 import com.personal.personalai.domain.tools.ToolRegistry
 import com.personal.personalai.domain.tools.ToolResult
+import com.personal.personalai.presentation.settings.PreferencesKeys
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -34,15 +39,16 @@ sealed class AgentStep {
 private const val MAX_ITERATIONS = 8
 private const val TAG = "AgentLoopUseCase"
 
-/** Base size of the rolling chat-history window sent to the LLM. */
+/** Cold-start history size when no warm chain is available. */
 private const val HISTORY_WINDOW = 20
 
 /**
- * Older messages within this window of "now" are kept in the prompt even if
- * they fall outside [HISTORY_WINDOW], so the cached prompt prefix stays stable
- * across rapid back-to-back turns and OpenAI's prompt cache hits.
+ * Re-use the previous response_id from OpenAI as long as the last call was
+ * within this window. Beyond it, we cold-start (last [HISTORY_WINDOW] msgs).
+ * Practical effect: OpenAI never accumulates more than one "burst of activity"
+ * worth of context per chain.
  */
-private const val CACHE_STICKINESS_MS = 5L * 60L * 1000L
+private const val CHAIN_WARM_MS = 10L * 60L * 1000L
 
 private val DATE_FORMATTER: DateTimeFormatter =
     DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")
@@ -54,19 +60,22 @@ private fun formatIso(epochMillis: Long): String =
 
 /**
  * Orchestrates the multi-turn agent loop:
- * 1. Build conversation from history + memories + tool definitions
- * 2. Call AI → if tool calls: execute, append results, loop
- * 3. If text response: save to DB (if !backgroundMode), emit Complete
+ * 1. Decide warm-chain vs cold-start from the stored previous_response_id.
+ * 2. Build initial input — just the new user message (warm) or last 20 (cold).
+ * 3. Call AI. If tool calls → execute, send outputs back chained to the same
+ *    response_id, loop. If text → persist response_id, save message, emit.
  *
- * @param backgroundMode When true, skips saving the trigger message to chat history and
- *   uses only background-safe tools. Used by TaskReminderWorker.
+ * @param backgroundMode When true, skips saving the trigger message to chat history,
+ *   uses only background-safe tools, and never reads or writes the chain id (chats
+ *   and scheduled-task pings live in separate chains).
  */
 class AgentLoopUseCase @Inject constructor(
     private val aiRepository: AiRepository,
     private val chatRepository: ChatRepository,
     private val memoryRepository: MemoryRepository,
     private val toolRegistry: ToolRegistry,
-    private val permissionBroker: PermissionBroker
+    private val permissionBroker: PermissionBroker,
+    private val dataStore: DataStore<Preferences>,
 ) {
     operator fun invoke(
         message: String,
@@ -83,80 +92,58 @@ class AgentLoopUseCase @Inject constructor(
         val tools = if (backgroundMode) toolRegistry.getBackgroundSafeTools()
                     else toolRegistry.getTools()
 
-        // 3. Build initial conversationItems from recent history.
-        //
-        // Window strategy: take the last HISTORY_WINDOW messages, then extend
-        // backwards as long as the next-older message was sent within
-        // CACHE_STICKINESS_MS of now. This keeps the same starting message
-        // across rapid back-to-back turns so the OpenAI prompt cache hits.
-        val conversationItems = JSONArray()
-        if (!backgroundMode) {
-            val all = chatRepository.getMessages().first()
-            val now = System.currentTimeMillis()
-            val stickyCutoff = now - CACHE_STICKINESS_MS
-            var startIdx = (all.size - HISTORY_WINDOW).coerceAtLeast(0)
-            while (startIdx > 0 && all[startIdx - 1].timestamp >= stickyCutoff) {
-                startIdx--
-            }
-            all.subList(startIdx, all.size).forEach { msg ->
-                conversationItems.put(JSONObject().apply {
-                    put("role", if (msg.role == MessageRole.USER) "user" else "assistant")
-                    // Stamp every user turn with its own immutable send-time.
-                    // Because the stamp is derived from msg.timestamp (fixed at
-                    // save), older user messages render identically on every
-                    // subsequent call → the prompt cache prefix stays stable.
-                    put(
-                        "content",
-                        if (msg.role == MessageRole.USER) {
-                            "[Sent at: ${formatIso(msg.timestamp)}]\n\n${msg.content}"
-                        } else {
-                            msg.content
-                        }
-                    )
-                })
-            }
+        // 3. Decide warm/cold and build the initial input items.
+        //    - Warm: a valid previous_response_id within CHAIN_WARM_MS. Send only the new turn.
+        //    - Cold: no chain or expired. Send the last HISTORY_WINDOW messages.
+        var previousResponseId: String? =
+            if (backgroundMode) null else readWarmChainId()
+        var conversationItems = if (previousResponseId != null) {
+            buildWarmInput(message)
         } else {
-            // Background: just the AI prompt as the single user turn
-            conversationItems.put(JSONObject().apply {
-                put("role", "user")
-                put(
-                    "content",
-                    "[Sent at: ${formatIso(System.currentTimeMillis())}]\n\n$message"
-                )
-            })
+            buildColdInput(backgroundMode, message)
         }
 
         // 4. Agent loop
         repeat(MAX_ITERATIONS) { iteration ->
             val llmStartMs = SystemClock.elapsedRealtime()
-            val response = aiRepository.sendMessageWithTools(conversationItems, memories, tools)
-                .getOrElse { e ->
-                    Log.e(
-                        TAG,
-                        "iteration=${iteration + 1} llmFailed after ${SystemClock.elapsedRealtime() - llmStartMs}ms: ${e.message}",
-                        e
-                    )
-                    emit(AgentStep.Complete(Result.failure(e)))
-                    return@flow
-                }
+            var response = aiRepository.sendMessageWithTools(
+                conversationItems, memories, tools, previousResponseId
+            ).getOrNull()
+
+            // Stale-chain fallback: if the very first call fails and we were
+            // chaining, retry once cold. Only the first iteration is eligible
+            // because subsequent ones use a response_id we just received.
+            if (response == null && iteration == 0 && previousResponseId != null) {
+                Log.w(TAG, "Chained call failed; retrying cold-start")
+                clearChainId()
+                previousResponseId = null
+                conversationItems = buildColdInput(backgroundMode, message)
+                response = aiRepository.sendMessageWithTools(
+                    conversationItems, memories, tools, null
+                ).getOrNull()
+            }
+
+            if (response == null) {
+                val e = Exception("AI call failed at iteration ${iteration + 1}")
+                Log.e(TAG, "iteration=${iteration + 1} llmFailed after ${SystemClock.elapsedRealtime() - llmStartMs}ms")
+                emit(AgentStep.Complete(Result.failure(e)))
+                return@flow
+            }
+
             Log.d(
                 TAG,
                 "iteration=${iteration + 1} llmMs=${SystemClock.elapsedRealtime() - llmStartMs} " +
-                    "response=${response::class.simpleName}"
+                    "response=${response::class.simpleName} chained=${previousResponseId != null}"
             )
 
             when (response) {
                 is AgentResponse.ToolCalls -> {
+                    // Capture the response_id; the next iteration chains to it
+                    // and only needs to send the tool outputs.
+                    val nextChainId = response.responseId
+                    val toolOutputs = JSONArray()
                     response.calls.forEach { call ->
                         emit(AgentStep.ToolCalling(call.name, humanReadable(call.name, call.arguments)))
-
-                        // Append the function_call item to conversation
-                        conversationItems.put(JSONObject().apply {
-                            put("type", "function_call")
-                            put("call_id", call.id)
-                            put("name", call.name)
-                            put("arguments", call.arguments)
-                        })
 
                         // Execute the tool
                         val toolStartMs = SystemClock.elapsedRealtime()
@@ -170,7 +157,6 @@ class AgentLoopUseCase @Inject constructor(
                         // If the tool requires a permission that hasn't been granted, request it
                         val toolResult = if (rawResult is ToolResult.PermissionDenied) {
                             if (backgroundMode) {
-                                // No UI available in background — fail descriptively
                                 ToolResult.Error(
                                     "Permission '${rawResult.permission}' not granted. Open the app to grant it."
                                 )
@@ -187,22 +173,41 @@ class AgentLoopUseCase @Inject constructor(
                             }
                         } else rawResult
 
-                        // Append the function_call_output item
-                        conversationItems.put(JSONObject().apply {
+                        toolOutputs.put(JSONObject().apply {
                             put("type", "function_call_output")
                             put("call_id", call.id)
                             put("output", toolResult.toJson())
                         })
                     }
-                    // Continue loop
+
+                    if (nextChainId != null) {
+                        // Stateful path: chain to the response we just got, send only outputs.
+                        previousResponseId = nextChainId
+                        conversationItems = toolOutputs
+                    } else {
+                        // Stateless path (Ollama/Local): append function_call + outputs to
+                        // the existing conversation array and continue.
+                        response.calls.forEach { call ->
+                            conversationItems.put(JSONObject().apply {
+                                put("type", "function_call")
+                                put("call_id", call.id)
+                                put("name", call.name)
+                                put("arguments", call.arguments)
+                            })
+                        }
+                        for (i in 0 until toolOutputs.length()) {
+                            conversationItems.put(toolOutputs.getJSONObject(i))
+                        }
+                    }
                 }
 
                 is AgentResponse.Text -> {
-                    // Save assistant response to DB (foreground only)
                     if (!backgroundMode) {
                         chatRepository.saveMessage(
                             Message(content = response.text, role = MessageRole.ASSISTANT)
                         )
+                        // Persist the chain id only after a successful final response.
+                        response.responseId?.let { saveChainId(it) }
                     }
                     Log.d(
                         TAG,
@@ -215,9 +220,75 @@ class AgentLoopUseCase @Inject constructor(
             }
         }
 
-        // Exceeded max iterations without a text response
         emit(AgentStep.Complete(Result.failure(Exception("Agent loop exceeded $MAX_ITERATIONS iterations"))))
     }.flowOn(Dispatchers.IO)
+
+    // ── Input builders ────────────────────────────────────────────────────────
+
+    /** Warm-chain input: just the new user message, with its send-time stamp. */
+    private fun buildWarmInput(message: String): JSONArray = JSONArray().apply {
+        put(JSONObject().apply {
+            put("role", "user")
+            put("content", "[Sent at: ${formatIso(System.currentTimeMillis())}]\n\n$message")
+        })
+    }
+
+    /**
+     * Cold-start input: the last [HISTORY_WINDOW] messages from chat history,
+     * each user turn stamped with its immutable send-time. The just-saved
+     * latest user message is the final item.
+     */
+    private suspend fun buildColdInput(backgroundMode: Boolean, message: String): JSONArray {
+        val items = JSONArray()
+        if (backgroundMode) {
+            items.put(JSONObject().apply {
+                put("role", "user")
+                put("content", "[Sent at: ${formatIso(System.currentTimeMillis())}]\n\n$message")
+            })
+            return items
+        }
+        val all = chatRepository.getMessages().first()
+        val startIdx = (all.size - HISTORY_WINDOW).coerceAtLeast(0)
+        all.subList(startIdx, all.size).forEach { msg ->
+            items.put(JSONObject().apply {
+                put("role", if (msg.role == MessageRole.USER) "user" else "assistant")
+                put(
+                    "content",
+                    if (msg.role == MessageRole.USER) {
+                        "[Sent at: ${formatIso(msg.timestamp)}]\n\n${msg.content}"
+                    } else {
+                        msg.content
+                    }
+                )
+            })
+        }
+        return items
+    }
+
+    // ── Chain-id persistence ──────────────────────────────────────────────────
+
+    private suspend fun readWarmChainId(): String? {
+        val prefs = dataStore.data.first()
+        val id = prefs[PreferencesKeys.LAST_RESPONSE_ID]?.takeIf { it.isNotBlank() } ?: return null
+        val at = prefs[PreferencesKeys.LAST_RESPONSE_AT_MS] ?: return null
+        return if (System.currentTimeMillis() - at < CHAIN_WARM_MS) id else null
+    }
+
+    private suspend fun saveChainId(id: String) {
+        dataStore.edit { prefs ->
+            prefs[PreferencesKeys.LAST_RESPONSE_ID] = id
+            prefs[PreferencesKeys.LAST_RESPONSE_AT_MS] = System.currentTimeMillis()
+        }
+    }
+
+    private suspend fun clearChainId() {
+        dataStore.edit { prefs ->
+            prefs.remove(PreferencesKeys.LAST_RESPONSE_ID)
+            prefs.remove(PreferencesKeys.LAST_RESPONSE_AT_MS)
+        }
+    }
+
+    // ── Human-readable tool descriptions ──────────────────────────────────────
 
     private fun humanReadable(toolName: String, arguments: String): String {
         val args = runCatching { JSONObject(arguments) }.getOrDefault(JSONObject())

@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -27,6 +28,13 @@ object PreferencesKeys {
     val SERPER_API_KEY = stringPreferencesKey("serper_api_key")
     val LOCAL_MODEL    = stringPreferencesKey("local_model")
     val HF_TOKEN       = stringPreferencesKey("hf_token")
+
+    // OpenAI Responses API stateful-chain bookkeeping. We pass last response_id
+    // as previous_response_id on the next call, but only while the chain is
+    // "warm" (recent activity). After CHAIN_WARM_MS of silence we discard it
+    // and cold-start with the last N messages.
+    val LAST_RESPONSE_ID    = stringPreferencesKey("last_response_id")
+    val LAST_RESPONSE_AT_MS = longPreferencesKey("last_response_at_ms")
 }
 
 @HiltViewModel
@@ -99,6 +107,9 @@ class SettingsViewModel @Inject constructor(
                     AiProvider.OPENAI -> "openai"
                     AiProvider.LOCAL  -> "local"
                 }
+                // A stored OpenAI response_id is meaningless to other providers.
+                prefs.remove(PreferencesKeys.LAST_RESPONSE_ID)
+                prefs.remove(PreferencesKeys.LAST_RESPONSE_AT_MS)
             }
             _uiState.update { it.copy(aiProvider = provider) }
         }

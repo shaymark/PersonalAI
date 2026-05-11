@@ -58,7 +58,8 @@ class OpenAiDataSource @Inject constructor(
         apiKey: String,
         conversationItems: JSONArray,
         memories: List<Memory>,
-        tools: List<AgentTool>
+        tools: List<AgentTool>,
+        previousResponseId: String? = null,
     ): Result<AgentResponse> = withContext(Dispatchers.IO) {
         try {
             val toolsArray = JSONArray()
@@ -77,6 +78,9 @@ class OpenAiDataSource @Inject constructor(
                 put("instructions", buildToolsSystemPrompt(memories))
                 put("tools", toolsArray)
                 put("input", conversationItems)
+                if (previousResponseId != null) {
+                    put("previous_response_id", previousResponseId)
+                }
             }
 
             apiClient.executeRequest(

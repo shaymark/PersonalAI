@@ -42,7 +42,8 @@ class AiRepositoryImpl @Inject constructor(
     override suspend fun sendMessageWithTools(
         conversationItems: JSONArray,
         memories: List<Memory>,
-        tools: List<AgentTool>
+        tools: List<AgentTool>,
+        previousResponseId: String?,
     ): Result<AgentResponse> {
         return when (readProvider()) {
             "local" -> localLlmDataSource.sendMessageWithTools(conversationItems, memories, tools)
@@ -87,7 +88,8 @@ class AiRepositoryImpl @Inject constructor(
                         apiKey,
                         conversationItems,
                         memories,
-                        tools
+                        tools,
+                        previousResponseId,
                     )
                 }
             }
